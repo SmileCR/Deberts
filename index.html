@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Деберц — лічильник</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Деберц" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0E271D" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' rx=\'20\' fill=\'%230E271D\'/%3E%3Cline x1=\'28\' y1=\'72\' x2=\'28\' y2=\'30\' stroke=\'%23D8B26A\' stroke-width=\'7\' stroke-linecap=\'round\'/%3E%3Cline x1=\'42\' y1=\'72\' x2=\'42\' y2=\'30\' stroke=\'%23D8B26A\' stroke-width=\'7\' stroke-linecap=\'round\'/%3E%3Cline x1=\'56\' y1=\'72\' x2=\'56\' y2=\'30\' stroke=\'%23D8B26A\' stroke-width=\'7\' stroke-linecap=\'round\'/%3E%3Cline x1=\'20\' y1=\'28\' x2=\'64\' y2=\'74\' stroke=\'%23D8B26A\' stroke-width=\'7\' stroke-linecap=\'round\'/%3E%3Ccircle cx=\'78\' cy=\'50\' r=\'13\' stroke=\'%23D8B26A\' stroke-width=\'6\' fill=\'none\'/%3E%3C/svg%3E" />
+<style>
+  html,body{margin:0;padding:0;background:#0E271D;}
+  #root{min-height:100dvh;}
+  #boot{min-height:100dvh;display:flex;align-items:center;justify-content:center;color:#F4EEDC;font-family:sans-serif;}
+</style>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+</head>
+<body>
+<div id="root"><div id="boot">Завантаження…</div></div>
+<script>
+window.addEventListener("error", function (e) {
+  var r = document.getElementById("root");
+  if (r) r.innerHTML = '<div style="padding:24px;color:#F4EEDC;font-family:sans-serif;white-space:pre-wrap;">Помилка запуску:\n' + (e.message || e) + '</div>';
+});
+</script>
+<script>
+const { useState, useEffect, useRef, useMemo } = React;
+function IconBase({ glyph, size = 16, color, style }) {
+  return /* @__PURE__ */ React.createElement("span", { style: {
+    fontSize: size,
+    lineHeight: 1,
+    color,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: size,
+    height: size,
+    ...style
+  } }, glyph);
+}
+const Plus = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "+", ...p });
+const Undo2 = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u21BA", ...p });
+const SettingsIcon = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2699", ...p });
+const HistoryIcon = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u{1F550}", ...p });
+const BarChart3 = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u{1F4CA}", ...p });
+const Sun = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2600", ...p });
+const Moon = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u263E", ...p });
+const X = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2715", ...p });
+const Check = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2713", ...p });
+const Crown = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u265B", ...p });
+const RotateCcw = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u21BA", ...p });
+const AlertTriangle = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u26A0", ...p });
+const Pencil = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u270E", ...p });
+const Info = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u24D8", ...p });
+const Download = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2B07", ...p });
+const Upload = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2B06", ...p });
+const ChevronRight = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u203A", ...p });
+const ShieldCheck = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2713", ...p });
+const RUN_COMBOS = [
+  { key: "terc", label: "\u0422\u0435\u0440\u0446", desc: "3 \u043A\u0430\u0440\u0442\u0438 \u043F\u043E\u0441\u043F\u0456\u043B\u044C \u043E\u0434\u043D\u0456\u0454\u0457 \u043C\u0430\u0441\u0442\u0456", value: 20 },
+  { key: "poltinnik", label: "\u041F\u043E\u043B\u0442\u0438\u043D\u043D\u0438\u043A", desc: "4 \u043A\u0430\u0440\u0442\u0438 \u043F\u043E\u0441\u043F\u0456\u043B\u044C \u043E\u0434\u043D\u0456\u0454\u0457 \u043C\u0430\u0441\u0442\u0456", value: 50 },
+  { key: "sotnya", label: "\u0421\u043E\u0442\u043D\u044F", desc: "5 \u043A\u0430\u0440\u0442 \u043F\u043E\u0441\u043F\u0456\u043B\u044C \u043E\u0434\u043D\u0456\u0454\u0457 \u043C\u0430\u0441\u0442\u0456", value: 100 }
+];
+const MARRIAGE = { key: "marriage", label: "\u041C\u0430\u0440'\u044F\u0436 / \u0411\u0435\u043B\u043B\u0430", desc: "\u041A\u043E\u0437\u0438\u0440\u043D\u0456 \u0434\u0430\u043C\u0430 \u0456 \u043A\u043E\u0440\u043E\u043B\u044C (\u0431\u0435\u043B\u043B\u0430) \u0430\u0431\u043E \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u0438\u0439 \u043C\u0430\u0440'\u044F\u0436", value: 20 };
+const PLAYER_COLORS_DARK = ["#4FB48A", "#D08872", "#5B93C4", "#B183C4"];
+const PLAYER_COLORS_LIGHT = ["#1E6E4F", "#8A3A2F", "#2F5F82", "#6B4478"];
+const DEFAULT_NAMES = ["\u0413\u0440\u0430\u0432\u0435\u0446\u044C 1", "\u0413\u0440\u0430\u0432\u0435\u0446\u044C 2", "\u0413\u0440\u0430\u0432\u0435\u0446\u044C 3", "\u0413\u0440\u0430\u0432\u0435\u0446\u044C 4"];
+const DEBERTS_PRESETS = {
+  run7: "7 \u043A\u0430\u0440\u0442 \u043E\u0434\u043D\u0456\u0454\u0457 \u043C\u0430\u0441\u0442\u0456 \u043F\u043E\u0441\u043F\u0456\u043B\u044C (\u0432\u0456\u0434 \u0441\u0456\u043C\u043A\u0438 \u0434\u043E \u0442\u0443\u0437\u0430) \u2014 \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u044F, \u044F\u043A\u0443 \u043D\u0438\u0437\u043A\u0430 \u0434\u0436\u0435\u0440\u0435\u043B \u043F\u0440\u043E \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0439 \u0432\u0430\u0440\u0456\u0430\u043D\u0442 \u043E\u043F\u0438\u0441\u0443\u0454 \u044F\u043A \u043C\u0438\u0442\u0442\u0454\u0432\u0443 \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0443 \u0432 \u043F\u0430\u0440\u0442\u0456\u0457 \u043D\u0435\u0437\u0430\u043B\u0435\u0436\u043D\u043E \u0432\u0456\u0434 \u043F\u043E\u0442\u043E\u0447\u043D\u043E\u0433\u043E \u0440\u0430\u0445\u0443\u043D\u043A\u0443."
+};
+const defaultSettings = () => ({
+  rulesVariant: "kharkiv",
+  // 'kharkiv' | 'custom' — обчислюється автоматично, показується як мітка
+  playerCount: 2,
+  targetScore: 1001,
+  // харківський варіант; 501 — класика
+  endCondition: "higher",
+  // 'higher' | 'lastDefenderWins' (лише для 2 гравців)
+  totalPointsEnabled: true,
+  totalPoints: 162,
+  // 152 очки карт + 10 за послід — типове значення, можна вимкнути перевірку
+  capotEnabled: false,
+  capotBonus: 90,
+  capotAutoSuggest: true,
+  noTricksEnabled: true,
+  noTricksPenalty: 50,
+  underTargetRule: "all_to_opponent",
+  // 'all_to_opponent' | 'trick_only' | 'off'
+  underTargetDistribution: "highest",
+  // 'highest' | 'split' — тільки якщо гравців > 2
+  debertsInstantWin: true,
+  debertsDefinitionKey: "run7",
+  // 'run7' | 'custom'
+  debertsDefinitionCustom: "",
+  comboValues: { terc: 20, poltinnik: 50, sotnya: 100, marriage: 20 }
+});
+function isKharkivPreset(s) {
+  const d = defaultSettings();
+  return s.targetScore === d.targetScore && s.endCondition === d.endCondition && s.totalPointsEnabled === d.totalPointsEnabled && s.totalPoints === d.totalPoints && s.noTricksEnabled === d.noTricksEnabled && s.noTricksPenalty === d.noTricksPenalty && s.underTargetRule === d.underTargetRule && s.debertsInstantWin === d.debertsInstantWin && s.debertsDefinitionKey === d.debertsDefinitionKey;
+}
+function debertsText(settings) {
+  return settings.debertsDefinitionKey === "custom" ? settings.debertsDefinitionCustom || "\u041E\u043F\u0438\u0448\u0456\u0442\u044C \u0432\u043B\u0430\u0441\u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0457 \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445." : DEBERTS_PRESETS.run7;
+}
+function playersArray(game) {
+  const n = game.settings.playerCount;
+  const ids = ["p1", "p2", "p3", "p4"].slice(0, n);
+  return ids.map((id, i) => ({ id, name: game.players[id] || "", idx: i }));
+}
+function playerName(game, id) {
+  const i = ["p1", "p2", "p3", "p4"].indexOf(id);
+  return game.players[id] && game.players[id].trim() || DEFAULT_NAMES[i] || id;
+}
+function playerColor(game, id, T) {
+  const i = ["p1", "p2", "p3", "p4"].indexOf(id);
+  return (game.theme === "dark" ? PLAYER_COLORS_DARK : PLAYER_COLORS_LIGHT)[i] || T.gold;
+}
+function emptyPerPlayer(players) {
+  const o = {};
+  players.forEach((p) => o[p.id] = { trick: "", runCombo: null, marriage: false, capot: false, noTricks: false });
+  return o;
+}
+function comboSum(entry, comboValues) {
+  let s = 0;
+  if (entry.runCombo) s += Number(comboValues[entry.runCombo]) || 0;
+  if (entry.marriage) s += Number(comboValues.marriage) || 0;
+  return s;
+}
+function rawTotal(entry, comboValues) {
+  return (Number(entry.trick) || 0) + comboSum(entry, comboValues);
+}
+function calculateUnderTarget(form, players, settings) {
+  const result = {};
+  players.forEach((p) => result[p.id] = { ...form.perPlayer[p.id] });
+  if (!form.callerId || !form.underTarget || settings.underTargetRule === "off") {
+    return { perPlayer: result, message: null };
+  }
+  const caller = form.perPlayer[form.callerId];
+  const callerTrick = Number(caller.trick) || 0;
+  const callerCombos = comboSum(caller, settings.comboValues);
+  const opponents = players.filter((p) => p.id !== form.callerId);
+  let transferAmount = 0;
+  if (settings.underTargetRule === "all_to_opponent") {
+    transferAmount = callerTrick + callerCombos;
+    result[form.callerId] = { ...caller, trick: 0, runCombo: null, marriage: false };
+  } else if (settings.underTargetRule === "trick_only") {
+    transferAmount = callerTrick;
+    result[form.callerId] = { ...caller, trick: 0 };
+  }
+  if (opponents.length === 1) {
+    result[opponents[0].id]._extra = (result[opponents[0].id]._extra || 0) + transferAmount;
+  } else if (settings.underTargetDistribution === "split") {
+    const share = transferAmount / opponents.length;
+    opponents.forEach((o) => result[o.id]._extra = (result[o.id]._extra || 0) + share);
+  } else {
+    let best = opponents[0];
+    let bestVal = rawTotal(form.perPlayer[best.id], settings.comboValues);
+    opponents.forEach((o) => {
+      const v = rawTotal(form.perPlayer[o.id], settings.comboValues);
+      if (v > bestVal) {
+        best = o;
+        bestVal = v;
+      }
+    });
+    result[best.id]._extra = (result[best.id]._extra || 0) + transferAmount;
+  }
+  const ruleLabel = settings.underTargetRule === "all_to_opponent" ? "\u0443\u0441\u0456 \u0439\u043E\u0433\u043E \u043E\u0447\u043A\u0438 \u0446\u0456\u0454\u0457 \u0440\u043E\u0437\u0434\u0430\u0447\u0456 \u043F\u0435\u0440\u0435\u0445\u043E\u0434\u044F\u0442\u044C \u0441\u0443\u043F\u0435\u0440\u043D\u0438\u043A\u0430\u043C" : "\u043B\u0438\u0448\u0435 \u043E\u0447\u043A\u0438 \u0432\u0437\u044F\u0442\u043E\u043A \u043F\u0435\u0440\u0435\u0445\u043E\u0434\u044F\u0442\u044C \u0441\u0443\u043F\u0435\u0440\u043D\u0438\u043A\u0430\u043C, \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0457 \u0437\u0430\u043B\u0438\u0448\u0430\u044E\u0442\u044C\u0441\u044F";
+  const targetNames = opponents.map((o) => playerNameFromList(players, o.id)).join(", ");
+  const message = `${playerNameFromList(players, form.callerId)} \u043D\u0435 \u0432\u0438\u043A\u043E\u043D\u0430\u0432(\u043B\u0430) \u0437\u0430\u043C\u043E\u0432\u043B\u0435\u043D\u043D\u044F. \u0417\u0430 \u0432\u0438\u0431\u0440\u0430\u043D\u0438\u043C \u043F\u0440\u0430\u0432\u0438\u043B\u043E\u043C ${ruleLabel} (${targetNames}: +${Math.round(transferAmount)}).`;
+  return { perPlayer: result, message };
+}
+function playerNameFromList(players, id) {
+  const p = players.find((x) => x.id === id);
+  return p ? p.displayName || id : id;
+}
+function computeRound(form, players, settings) {
+  const { perPlayer: afterUT, message: underTargetMessage } = calculateUnderTarget(form, players, settings);
+  const finals = {};
+  const breakdown = {};
+  players.forEach((p) => {
+    const entry = afterUT[p.id];
+    const orig = form.perPlayer[p.id];
+    let val = rawTotal(entry, settings.comboValues) + (entry._extra || 0);
+    let capotBonus = 0;
+    let noTricksPenalty = 0;
+    if (orig.capot && settings.capotEnabled) capotBonus = Number(settings.capotBonus) || 0;
+    if (orig.noTricks && settings.noTricksEnabled) noTricksPenalty = -(Number(settings.noTricksPenalty) || 0);
+    val += capotBonus + noTricksPenalty;
+    finals[p.id] = val;
+    breakdown[p.id] = {
+      trick: Number(entry.trick) || 0,
+      combos: comboSum(orig, settings.comboValues),
+      transferred: entry._extra || 0,
+      capotBonus,
+      noTricksPenalty,
+      final: val
+    };
+  });
+  return { finals, breakdown, underTargetMessage };
+}
+function evaluateEnd(rounds, players, settings) {
+  const cumTimeline = [];
+  const cum = {};
+  players.forEach((p) => cum[p.id] = 0);
+  let finished = false;
+  let winner = null;
+  let finishedAtIndex = null;
+  let reason = null;
+  for (let i = 0; i < rounds.length; i++) {
+    const r = rounds[i];
+    players.forEach((p) => cum[p.id] += r.finals[p.id] || 0);
+    cumTimeline.push({ ...cum });
+    if (finished) continue;
+    if (r.debertsPlayerId && r.debertsConfirmed && settings.debertsInstantWin) {
+      finished = true;
+      winner = r.debertsPlayerId;
+      finishedAtIndex = i;
+      reason = "deberts";
+      continue;
+    }
+    const crossed = players.filter((p) => cum[p.id] >= settings.targetScore);
+    if (crossed.length === 1) {
+      finished = true;
+      winner = crossed[0].id;
+      finishedAtIndex = i;
+      reason = "target";
+    } else if (crossed.length > 1) {
+      if (settings.endCondition === "lastDefenderWins" && players.length === 2 && r.callerId) {
+        finished = true;
+        winner = r.callerId === players[0].id ? players[1].id : players[0].id;
+        finishedAtIndex = i;
+        reason = "lastDefender";
+      } else {
+        let best = crossed[0];
+        let bestVal = cum[best.id];
+        let tie = false;
+        crossed.forEach((p) => {
+          if (cum[p.id] > bestVal) {
+            best = p;
+            bestVal = cum[p.id];
+            tie = false;
+          } else if (cum[p.id] === bestVal && p.id !== best.id) {
+            tie = true;
+          }
+        });
+        if (!tie) {
+          finished = true;
+          winner = best.id;
+          finishedAtIndex = i;
+          reason = "target";
+        }
+      }
+    }
+  }
+  return { cum, cumTimeline, finished, winner, finishedAtIndex, reason };
+}
+function validateRound(form, players, settings) {
+  const errors = [];
+  const warnings = [];
+  players.forEach((p) => {
+    const t = form.perPlayer[p.id].trick;
+    if (t !== "" && (!/^\d+$/.test(String(t)) || Number(t) < 0)) {
+      errors.push(`${p.displayName}: \u043E\u0447\u043A\u0438 \u0432\u0437\u044F\u0442\u043E\u043A \u043C\u0430\u044E\u0442\u044C \u0431\u0443\u0442\u0438 \u0446\u0456\u043B\u0438\u043C \u043D\u0435\u0432\u0456\u0434'\u0454\u043C\u043D\u0438\u043C \u0447\u0438\u0441\u043B\u043E\u043C.`);
+    }
+  });
+  const trickSum = players.reduce((s, p) => s + (Number(form.perPlayer[p.id].trick) || 0), 0);
+  if (settings.totalPointsEnabled) {
+    if (trickSum > settings.totalPoints) {
+      errors.push(`\u0421\u0443\u043C\u0430 \u043E\u0447\u043E\u043A \u0432\u0437\u044F\u0442\u043E\u043A (${trickSum}) \u043F\u0435\u0440\u0435\u0432\u0438\u0449\u0443\u0454 \u043C\u043E\u0436\u043B\u0438\u0432\u0443 \u0437\u0430 \u0440\u043E\u0437\u0434\u0430\u0447\u0443 (${settings.totalPoints}).`);
+    } else if (trickSum > 0 && trickSum !== settings.totalPoints) {
+      warnings.push(`\u0421\u0443\u043C\u0430 \u043E\u0447\u043E\u043A \u0432\u0437\u044F\u0442\u043E\u043A (${trickSum}) \u043D\u0435 \u0434\u043E\u0440\u0456\u0432\u043D\u044E\u0454 \u0437\u0432\u0438\u0447\u043D\u0456\u0439 (${settings.totalPoints}). \u042F\u043A\u0449\u043E \u0446\u0435 \u043D\u0430\u0432\u043C\u0438\u0441\u043D\u043E \u2014 \u043C\u043E\u0436\u043D\u0430 \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438.`);
+    }
+  }
+  const capotPlayers = players.filter((p) => form.perPlayer[p.id].capot);
+  if (capotPlayers.length > 1) {
+    errors.push("\u041A\u0430\u043F\u043E\u0442 \u043C\u043E\u0436\u043D\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u0442\u0438 \u043B\u0438\u0448\u0435 \u043E\u0434\u043D\u043E\u043C\u0443 \u0433\u0440\u0430\u0432\u0446\u044E \u0437\u0430 \u0440\u043E\u0437\u0434\u0430\u0447\u0443.");
+  }
+  if (capotPlayers.length === 1) {
+    const cp = capotPlayers[0];
+    if ((Number(form.perPlayer[cp.id].trick) || 0) <= 0) {
+      errors.push(`${cp.displayName}: \u043F\u0440\u0438 \u043A\u0430\u043F\u043E\u0442\u0456 \u043C\u0430\u044E\u0442\u044C \u0431\u0443\u0442\u0438 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u0456 \u043E\u0447\u043A\u0438 \u0432\u0437\u044F\u0442\u043E\u043A.`);
+    }
+    players.forEach((p) => {
+      if (p.id !== cp.id && (Number(form.perPlayer[p.id].trick) || 0) !== 0) {
+        errors.push(`\u041F\u0440\u0438 \u043A\u0430\u043F\u043E\u0442\u0456 \u0443 ${cp.displayName} \u0456\u043D\u0448\u0456 \u0433\u0440\u0430\u0432\u0446\u0456 \u043D\u0435 \u043C\u043E\u0436\u0443\u0442\u044C \u043C\u0430\u0442\u0438 \u043E\u0447\u043A\u0438 \u0432\u0437\u044F\u0442\u043E\u043A (${p.displayName} \u2260 0).`);
+      }
+    });
+  }
+  players.forEach((p) => {
+    const e = form.perPlayer[p.id];
+    if (e.noTricks && (Number(e.trick) || 0) !== 0) {
+      errors.push(`${p.displayName}: \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E \xAB\u0431\u0435\u0437 \u0432\u0437\u044F\u0442\u043E\u043A\xBB, \u0430\u043B\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u043E ${e.trick} \u043E\u0447\u043E\u043A \u0432\u0437\u044F\u0442\u043E\u043A.`);
+    }
+    if (e.noTricks && e.capot) {
+      errors.push(`${p.displayName}: \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u043E\u0434\u043D\u043E\u0447\u0430\u0441\u043D\u043E \xAB\u043A\u0430\u043F\u043E\u0442\xBB \u0456 \xAB\u0431\u0435\u0437 \u0432\u0437\u044F\u0442\u043E\u043A\xBB.`);
+    }
+  });
+  if (form.debertsPlayerId && !form.debertsConfirmed) {
+    errors.push("\u041F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0456\u0442\u044C \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u044E \xAB\u0414\u0435\u0431\u0435\u0440\u0446\xBB \u043F\u0435\u0440\u0435\u0434 \u0434\u043E\u0434\u0430\u0432\u0430\u043D\u043D\u044F\u043C \u0440\u043E\u0437\u0434\u0430\u0447\u0456.");
+  }
+  if (form.underTarget && !form.callerId) {
+    errors.push("\u041D\u0435\u0434\u043E\u0431\u0456\u0440 \u043C\u043E\u0436\u043D\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u0442\u0438 \u0442\u0456\u043B\u044C\u043A\u0438 \u0434\u043B\u044F \u0433\u0440\u0430\u0432\u0446\u044F, \u044F\u043A\u0438\u0439 \u0437\u0430\u043C\u043E\u0432\u043B\u044F\u0432 \u0433\u0440\u0443.");
+  }
+  return { errors, warnings, trickSum };
+}
+const STORAGE_KEY = "debertz:game:v2";
+async function saveGame(state) {
+  try {
+    if (typeof window !== "undefined" && window.storage && window.storage.set) {
+      const r = await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+      if (r) return true;
+    }
+  } catch (e) {
+  }
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      return true;
+    }
+  } catch (e) {
+  }
+  return false;
+}
+async function loadGame() {
+  try {
+    if (typeof window !== "undefined" && window.storage && window.storage.get) {
+      const r = await window.storage.get(STORAGE_KEY, false);
+      if (r && r.value) return JSON.parse(r.value);
+    }
+  } catch (e) {
+  }
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    }
+  } catch (e) {
+  }
+  return null;
+}
+async function clearGame() {
+  try {
+    if (typeof window !== "undefined" && window.storage && window.storage.delete) {
+      await window.storage.delete(STORAGE_KEY, false);
+    }
+  } catch (e) {
+  }
+  try {
+    if (typeof window !== "undefined" && window.localStorage) window.localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+  }
+}
+const THEMES = {
+  dark: {
+    bg: "#0E271D",
+    bgAlt: "#123222",
+    panel: "#163A28",
+    panelAlt: "#1D4A32",
+    border: "#2B5A3F",
+    text: "#F4EEDC",
+    textMuted: "#A9BCAD",
+    gold: "#D8B26A",
+    goldSoft: "rgba(216,178,106,0.16)",
+    danger: "#D9695F",
+    dangerSoft: "rgba(217,105,95,0.15)",
+    warn: "#D9B25F",
+    warnSoft: "rgba(217,178,95,0.15)",
+    shadow: "0 10px 30px rgba(0,0,0,0.35)",
+    overlay: "rgba(6,16,11,0.72)"
+  },
+  light: {
+    bg: "#F2E9D3",
+    bgAlt: "#ECE0C3",
+    panel: "#FFFCF3",
+    panelAlt: "#F8EFD8",
+    border: "#DDCB9C",
+    text: "#26301D",
+    textMuted: "#736A52",
+    gold: "#A97B2E",
+    goldSoft: "rgba(169,123,46,0.12)",
+    danger: "#A5382D",
+    dangerSoft: "rgba(165,56,45,0.10)",
+    warn: "#96721E",
+    warnSoft: "rgba(150,114,30,0.12)",
+    shadow: "0 10px 26px rgba(90,70,30,0.16)",
+    overlay: "rgba(60,48,24,0.45)"
+  }
+};
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
+function fmt(n) {
+  const v = Math.round(n);
+  return v >= 0 ? `+${v}` : `${v}`;
+}
+const defaultGame = () => ({
+  players: { p1: "", p2: "", p3: "", p4: "" },
+  rounds: [],
+  settings: defaultSettings(),
+  theme: "dark",
+  setupDone: false
+});
+function Modal({ children, onClose, T, maxWidth = 460 }) {
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { position: "fixed", inset: 0, background: T.overlay, display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50 },
+      onClick: onClose
+    },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: (e) => e.stopPropagation(),
+        style: {
+          background: T.panel,
+          width: "100%",
+          maxWidth,
+          maxHeight: "90dvh",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
+          borderTopLeftRadius: 22,
+          borderTopRightRadius: 22,
+          borderTop: `1px solid ${T.border}`,
+          boxShadow: T.shadow,
+          padding: "16px 16px calc(24px + env(safe-area-inset-bottom))",
+          color: T.text,
+          fontFamily: "'Inter',sans-serif"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 40, height: 4, borderRadius: 4, background: T.border } })),
+      children
+    )
+  );
+}
+function SegButton({ active, onClick, children, T, color, disabled }) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick,
+      disabled,
+      style: {
+        flex: 1,
+        minHeight: 44,
+        padding: "9px 6px",
+        borderRadius: 12,
+        border: `1.5px solid ${active ? color : T.border}`,
+        background: active ? color + "22" : "transparent",
+        color: active ? color : T.textMuted,
+        fontFamily: "'Inter',sans-serif",
+        fontWeight: 600,
+        fontSize: 13,
+        opacity: disabled ? 0.4 : 1,
+        transition: "all .15s"
+      }
+    },
+    children
+  );
+}
+function NumField({ label, value, onChange, T, accent }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.textMuted, marginBottom: 5 } }, label), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      inputMode: "numeric",
+      pattern: "[0-9]*",
+      value,
+      onChange: (e) => onChange(e.target.value.replace(/[^0-9]/g, "")),
+      placeholder: "0",
+      style: {
+        width: "100%",
+        boxSizing: "border-box",
+        fontFamily: "'IBM Plex Mono',monospace",
+        fontSize: 22,
+        fontWeight: 600,
+        textAlign: "center",
+        padding: "12px 4px",
+        borderRadius: 12,
+        border: `1.5px solid ${T.border}`,
+        background: T.panelAlt,
+        color: accent || T.text,
+        outline: "none"
+      }
+    }
+  ));
+}
+function Toggle({ checked, onChange, T, color }) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => onChange(!checked),
+      style: { width: 44, height: 26, borderRadius: 999, border: `1px solid ${checked ? color : T.border}`, background: checked ? color : T.panelAlt, position: "relative", flexShrink: 0 }
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: checked ? 20 : 2, width: 20, height: 20, borderRadius: "50%", background: T.panel, transition: "left .15s" } })
+  );
+}
+function Chip({ label, onRemove, T, color }) {
+  return /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, padding: "6px 6px 6px 11px", borderRadius: 999, background: color + "22", color, fontWeight: 600 } }, label, onRemove && /* @__PURE__ */ React.createElement("button", { onClick: onRemove, style: { background: color + "33", border: "none", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", color } }, /* @__PURE__ */ React.createElement(X, { size: 11 })));
+}
+function AddChip({ label, onClick, T, disabled }) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick,
+      disabled,
+      style: { fontSize: 12.5, padding: "7px 12px", borderRadius: 999, border: `1.5px dashed ${T.border}`, background: "transparent", color: disabled ? T.textMuted + "80" : T.text, fontWeight: 600, opacity: disabled ? 0.5 : 1 }
+    },
+    "+ ",
+    label
+  );
+}
+function ErrorBox({ items, T, color, icon }) {
+  if (!items || items.length === 0) return null;
+  return /* @__PURE__ */ React.createElement("div", { style: { background: color + "18", border: `1px solid ${color}`, borderRadius: 12, padding: "10px 12px", marginBottom: 12, display: "flex", gap: 8 } }, icon, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, lineHeight: 1.5 } }, items.map((t, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { marginBottom: i < items.length - 1 ? 4 : 0 } }, t))));
+}
+function PlayerNameInput({ value, onChange, T, color, placeholder }) {
+  return /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value,
+      onChange: (e) => onChange(e.target.value),
+      placeholder,
+      maxLength: 16,
+      style: {
+        background: "transparent",
+        border: "none",
+        borderBottom: `1.5px dashed ${T.border}`,
+        color,
+        fontFamily: "'Fraunces',serif",
+        fontWeight: 600,
+        fontSize: 15,
+        textAlign: "center",
+        width: "100%",
+        outline: "none",
+        padding: "2px 0"
+      }
+    }
+  );
+}
+function PlayerSetup({ T, initial, onStart }) {
+  const [count, setCount] = useState(initial.settings.playerCount || 2);
+  const [names, setNames] = useState({ ...initial.players });
+  const [variant, setVariant] = useState(initial.settings.rulesVariant || "kharkiv");
+  const apply = () => {
+    let settings = { ...initial.settings, playerCount: count };
+    if (variant === "kharkiv") settings = { ...settings, ...defaultSettings(), playerCount: count };
+    onStart({ names, settings, variant });
+  };
+  return /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 18px 40px", maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 22, marginBottom: 4 } }, "\u041D\u043E\u0432\u0430 \u043F\u0430\u0440\u0442\u0456\u044F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.textMuted, marginBottom: 20 } }, "\u0414\u0435\u0431\u0435\u0440\u0446 \u2014 \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456 \u043F\u0440\u0430\u0432\u0438\u043B\u0430"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, "\u0412\u0430\u0440\u0456\u0430\u043D\u0442 \u043F\u0440\u0430\u0432\u0438\u043B"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 18 } }, /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: variant === "kharkiv", onClick: () => setVariant("kharkiv") }, "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0439"), /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: variant === "custom", onClick: () => setVariant("custom") }, "\u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0446\u044C\u043A\u0438\u0439")), variant === "kharkiv" && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginBottom: 18, lineHeight: 1.5 } }, "\u0417\u0430\u0441\u0442\u043E\u0441\u0443\u0454 \u0442\u0438\u043F\u043E\u0432\u0456 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F: \u0433\u0440\u0430 \u0434\u043E 1001, \u043B\u0438\u0436\u0430 \u221250, \u043D\u0435\u0434\u043E\u0431\u0456\u0440 \u2014 \u0443\u0441\u0456 \u043E\u0447\u043A\u0438 \u0441\u0443\u043F\u0435\u0440\u043D\u0438\u043A\u0430\u043C, \u0434\u0435\u0431\u0435\u0440\u0446 \u2014 \u043C\u0438\u0442\u0442\u0454\u0432\u0430 \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430. \u0423\u0441\u0435 \u043C\u043E\u0436\u043D\u0430 \u0437\u043C\u0456\u043D\u0438\u0442\u0438 \u043F\u0456\u0437\u043D\u0456\u0448\u0435 \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445."), variant === "custom" && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginBottom: 18, lineHeight: 1.5 } }, "\u041F\u043E\u0442\u043E\u0447\u043D\u0456 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u043F\u0440\u0430\u0432\u0438\u043B \u0437\u0430\u043B\u0438\u0448\u0430\u0442\u044C\u0441\u044F \u0431\u0435\u0437 \u0437\u043C\u0456\u043D \u2014 \u0432\u0456\u0434\u0440\u0435\u0434\u0430\u0433\u0443\u0439\u0442\u0435 \u0457\u0445 \u043D\u0430 \u0432\u043A\u043B\u0430\u0434\u0446\u0456 \xAB\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\xBB."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, "\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0433\u0440\u0430\u0432\u0446\u0456\u0432"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 18 } }, [2, 3, 4].map((n) => /* @__PURE__ */ React.createElement(SegButton, { key: n, T, color: T.gold, active: count === n, onClick: () => setCount(n) }, n))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, "\u0406\u043C\u0435\u043D\u0430 \u0433\u0440\u0430\u0432\u0446\u0456\u0432"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 } }, ["p1", "p2", "p3", "p4"].slice(0, count).map((id, i) => /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      key: id,
+      value: names[id] || "",
+      onChange: (e) => setNames((n) => ({ ...n, [id]: e.target.value })),
+      placeholder: DEFAULT_NAMES[i],
+      maxLength: 16,
+      style: { padding: "12px 14px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'Inter',sans-serif", fontSize: 14 }
+    }
+  ))), /* @__PURE__ */ React.createElement("button", { onClick: apply, style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 15 } }, "\u041F\u043E\u0447\u0430\u0442\u0438 \u043F\u0430\u0440\u0442\u0456\u044E"));
+}
+function AddRoundModal({ T, game, players, editingRound, onClose, onSave }) {
+  const s = game.settings;
+  const [form, setForm] = useState(
+    () => editingRound ? {
+      callerId: editingRound.callerId,
+      underTarget: editingRound.underTarget,
+      perPlayer: JSON.parse(JSON.stringify(editingRound.rawPerPlayer)),
+      debertsPlayerId: editingRound.debertsPlayerId,
+      debertsConfirmed: editingRound.debertsConfirmed,
+      note: editingRound.note || ""
+    } : { callerId: null, underTarget: false, perPlayer: emptyPerPlayer(players), debertsPlayerId: null, debertsConfirmed: false, note: "" }
+  );
+  const [confirming, setConfirming] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const playersD = players.map((p) => ({ ...p, displayName: playerName(game, p.id) }));
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+  const setPP = (pid, patch) => setForm((f) => ({ ...f, perPlayer: { ...f.perPlayer, [pid]: { ...f.perPlayer[pid], ...patch } } }));
+  const { errors, warnings, trickSum } = validateRound(form, playersD, s);
+  const { finals, breakdown, underTargetMessage } = computeRound(form, playersD, s);
+  const capotSuggestion = s.capotEnabled && s.capotAutoSuggest && s.totalPointsEnabled && !playersD.some((p) => form.perPlayer[p.id].capot) ? playersD.find((p) => (Number(form.perPlayer[p.id].trick) || 0) === s.totalPoints && playersD.every((q) => q.id === p.id || (Number(form.perPlayer[q.id].trick) || 0) === 0) && s.totalPoints > 0) : null;
+  const setRunCombo = (pid, key) => {
+    setPP(pid, { runCombo: form.perPlayer[pid].runCombo === key ? null : key });
+  };
+  const setCapot = (pid) => {
+    setForm((f) => {
+      const pp = { ...f.perPlayer };
+      playersD.forEach((p) => pp[p.id] = { ...pp[p.id], capot: p.id === pid ? !pp[p.id].capot : false });
+      if (pp[pid].capot) pp[pid].noTricks = false;
+      return { ...f, perPlayer: pp };
+    });
+  };
+  const toggleNoTricks = (pid) => {
+    setPP(pid, { noTricks: !form.perPlayer[pid].noTricks, ...form.perPlayer[pid].noTricks ? {} : { capot: false } });
+  };
+  const canProceed = errors.length === 0;
+  const handleConfirm = () => {
+    if (submitting) return;
+    setSubmitting(true);
+    document.activeElement && document.activeElement.blur && document.activeElement.blur();
+    const rawPerPlayer = JSON.parse(JSON.stringify(form.perPlayer));
+    onSave({
+      id: editingRound ? editingRound.id : Date.now(),
+      callerId: form.callerId,
+      underTarget: form.underTarget,
+      rawPerPlayer,
+      debertsPlayerId: form.debertsPlayerId,
+      debertsConfirmed: form.debertsConfirmed,
+      note: form.note,
+      finals,
+      breakdown,
+      underTargetMessage
+    });
+    setTimeout(() => setSubmitting(false), 400);
+  };
+  if (confirming) {
+    return /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirming(false) }, /* @__PURE__ */ React.createElement(
+      RoundConfirm,
+      {
+        T,
+        game,
+        players: playersD,
+        form,
+        finals,
+        breakdown,
+        underTargetMessage,
+        roundNumber: editingRound ? editingRound.number : game.rounds.length + 1,
+        onBack: () => setConfirming(false),
+        onConfirm: handleConfirm,
+        submitting
+      }
+    ));
+  }
+  return /* @__PURE__ */ React.createElement(Modal, { T, onClose, maxWidth: 480 }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18 } }, editingRound ? `\u0420\u0435\u0434\u0430\u0433\u0443\u0432\u0430\u0442\u0438 \u0440\u043E\u0437\u0434\u0430\u0447\u0443 \u2116${editingRound.number}` : `\u0420\u043E\u0437\u0434\u0430\u0447\u0430 \u2116${game.rounds.length + 1}`), /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: T.textMuted } }, /* @__PURE__ */ React.createElement(X, { size: 20 }))), /* @__PURE__ */ React.createElement(SectionLabel, { T }, "1. \u0425\u0442\u043E \u0437\u0430\u043C\u043E\u0432\u043B\u044F\u0432 \u0433\u0440\u0443"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 } }, playersD.map((p) => /* @__PURE__ */ React.createElement(
+    SegButton,
+    {
+      key: p.id,
+      T,
+      color: playerColor(game, p.id, T),
+      active: form.callerId === p.id,
+      onClick: () => set({ callerId: form.callerId === p.id ? null : p.id, underTarget: false })
+    },
+    p.displayName
+  )), /* @__PURE__ */ React.createElement(SegButton, { T, color: T.textMuted, active: !form.callerId, onClick: () => set({ callerId: null, underTarget: false }) }, "\u0411\u0435\u0437 \u0437\u0430\u043C\u043E\u0432\u043B\u0435\u043D\u043D\u044F")), form.callerId && /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 18, fontSize: 13 } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: form.underTarget, onChange: (e) => set({ underTarget: e.target.checked }) }), "\u041D\u0435\u0434\u043E\u0431\u0456\u0440 \u2014 ", playerName(game, form.callerId), " \u043D\u0435 \u043D\u0430\u0431\u0440\u0430\u0432(\u043B\u0430) \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u043E\u0457 \u043A\u0456\u043B\u044C\u043A\u043E\u0441\u0442\u0456 \u043E\u0447\u043E\u043A"), /* @__PURE__ */ React.createElement(SectionLabel, { T }, "2. \u041E\u0447\u043A\u0438 \u0432\u0437\u044F\u0442\u043E\u043A"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 6 } }, playersD.map((p) => /* @__PURE__ */ React.createElement(
+    NumField,
+    {
+      key: p.id,
+      label: p.displayName,
+      value: form.perPlayer[p.id].trick,
+      onChange: (v) => setPP(p.id, { trick: v }),
+      T,
+      accent: playerColor(game, p.id, T)
+    }
+  ))), s.totalPointsEnabled && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: trickSum === s.totalPoints ? T.textMuted : T.warn, marginBottom: 16 } }, "\u0421\u0443\u043C\u0430: ", trickSum, " \u0437 ", s.totalPoints), /* @__PURE__ */ React.createElement(SectionLabel, { T }, "3. \u041A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0457"), playersD.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, fontWeight: 600, marginBottom: 6, color: playerColor(game, p.id, T) } }, p.displayName), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 7 } }, form.perPlayer[p.id].marriage && /* @__PURE__ */ React.createElement(Chip, { T, color: playerColor(game, p.id, T), label: `${MARRIAGE.label} +${s.comboValues.marriage}`, onRemove: () => setPP(p.id, { marriage: false }) }), form.perPlayer[p.id].runCombo && /* @__PURE__ */ React.createElement(
+    Chip,
+    {
+      T,
+      color: playerColor(game, p.id, T),
+      label: `${RUN_COMBOS.find((c) => c.key === form.perPlayer[p.id].runCombo).label} +${s.comboValues[form.perPlayer[p.id].runCombo]}`,
+      onRemove: () => setPP(p.id, { runCombo: null })
+    }
+  ), !form.perPlayer[p.id].marriage && /* @__PURE__ */ React.createElement(AddChip, { T, label: MARRIAGE.label, onClick: () => setPP(p.id, { marriage: true }) }), RUN_COMBOS.filter((c) => c.key !== form.perPlayer[p.id].runCombo).map((c) => /* @__PURE__ */ React.createElement(AddChip, { key: c.key, T, label: c.label, onClick: () => setRunCombo(p.id, c.key), disabled: !!form.perPlayer[p.id].runCombo && form.perPlayer[p.id].runCombo !== c.key }))))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.textMuted, margin: "2px 0 16px", lineHeight: 1.5 } }, /* @__PURE__ */ React.createElement(Info, { size: 11, style: { marginRight: 4, verticalAlign: -1 } }), "\u0422\u0435\u0440\u0446 / \u043F\u043E\u043B\u0442\u0438\u043D\u043D\u0438\u043A / \u0441\u043E\u0442\u043D\u044F \u2014 \u0440\u0430\u0445\u0443\u0454\u0442\u044C\u0441\u044F \u0442\u0456\u043B\u044C\u043A\u0438 \u0441\u0442\u0430\u0440\u0448\u0430 (\u043E\u0434\u043D\u0430) \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u044F \u043D\u0430 \u0433\u0440\u0430\u0432\u0446\u044F. \u041C\u0430\u0440'\u044F\u0436/\u0431\u0435\u043B\u043B\u0430 \u043C\u043E\u0436\u0435 \u0431\u0443\u0442\u0438 \u0440\u0430\u0437\u043E\u043C \u0456\u0437 \u043D\u0435\u044E."), /* @__PURE__ */ React.createElement(SectionLabel, { T }, "4. \u0421\u043F\u0435\u0446\u0456\u0430\u043B\u044C\u043D\u0456 \u0441\u0438\u0442\u0443\u0430\u0446\u0456\u0457"), s.capotEnabled && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: T.textMuted, marginBottom: 6 } }, "\u041A\u0430\u043F\u043E\u0442 (\u0443\u0441\u0456 \u0432\u0437\u044F\u0442\u043A\u0438 \u0437\u0430 \u0440\u043E\u0437\u0434\u0430\u0447\u0443)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, playersD.map((p) => /* @__PURE__ */ React.createElement(SegButton, { key: p.id, T, color: T.gold, active: form.perPlayer[p.id].capot, onClick: () => setCapot(p.id) }, p.displayName)))), capotSuggestion && /* @__PURE__ */ React.createElement("div", { style: { background: T.goldSoft, border: `1px solid ${T.gold}`, borderRadius: 12, padding: "10px 12px", marginBottom: 14, fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } }, /* @__PURE__ */ React.createElement("span", null, "\u0421\u0445\u043E\u0436\u0435 \u043D\u0430 \u043A\u0430\u043F\u043E\u0442. \u041F\u043E\u0437\u043D\u0430\u0447\u0438\u0442\u0438 \u0434\u043B\u044F ", playerName(game, capotSuggestion.id), "?"), /* @__PURE__ */ React.createElement("button", { onClick: () => setCapot(capotSuggestion.id), style: { background: T.gold, color: T.bg, border: "none", borderRadius: 8, padding: "6px 10px", fontWeight: 700, fontSize: 12, whiteSpace: "nowrap" } }, "\u0422\u0430\u043A")), s.noTricksEnabled && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: T.textMuted, marginBottom: 6 } }, "\u041B\u0438\u0436\u0430 (\u0431\u0435\u0437 \u0436\u043E\u0434\u043D\u043E\u0457 \u0432\u0437\u044F\u0442\u043A\u0438)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } }, playersD.map((p) => /* @__PURE__ */ React.createElement(SegButton, { key: p.id, T, color: T.danger, active: form.perPlayer[p.id].noTricks, onClick: () => toggleNoTricks(p.id) }, p.displayName)))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: T.textMuted, marginBottom: 6 } }, "\u0414\u0435\u0431\u0435\u0440\u0446"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: form.debertsPlayerId ? 10 : 0 } }, playersD.map((p) => /* @__PURE__ */ React.createElement(
+    SegButton,
+    {
+      key: p.id,
+      T,
+      color: T.gold,
+      active: form.debertsPlayerId === p.id,
+      onClick: () => set({ debertsPlayerId: form.debertsPlayerId === p.id ? null : p.id, debertsConfirmed: false })
+    },
+    p.displayName
+  ))), form.debertsPlayerId && /* @__PURE__ */ React.createElement("div", { style: { background: T.panelAlt, border: `1px solid ${T.border}`, borderRadius: 12, padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, lineHeight: 1.5, marginBottom: 8, color: T.textMuted } }, debertsText(s)), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600 } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: form.debertsConfirmed, onChange: (e) => set({ debertsConfirmed: e.target.checked }) }), "\u041F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0436\u0443\u044E: \u0443 ", playerName(game, form.debertsPlayerId), " \u0434\u0456\u0439\u0441\u043D\u043E \u0446\u044F \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u044F"), !s.debertsInstantWin && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.warn, marginTop: 6 } }, "\u041C\u0438\u0442\u0442\u0454\u0432\u0430 \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430 \u0432\u0438\u043C\u043A\u043D\u0435\u043D\u0430 \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u2014 \u0434\u043E\u0434\u0430\u0439\u0442\u0435 \u0431\u043E\u043D\u0443\u0441\u043D\u0456 \u043E\u0447\u043A\u0438 \u0432\u0440\u0443\u0447\u043D\u0443 \u0447\u0435\u0440\u0435\u0437 \u043C\u0430\u0440'\u044F\u0436/\u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0457 \u0430\u0431\u043E \u043F\u043E\u043B\u0435 \u043D\u0438\u0436\u0447\u0435, \u044F\u043A\u0449\u043E \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u043E."))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: T.textMuted, marginBottom: 6 } }, "\u0417\u0430\u043C\u0435\u0442\u043A\u0430 (\u043D\u0435\u043E\u0431\u043E\u0432'\u044F\u0437\u043A\u043E\u0432\u043E)"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value: form.note,
+      onChange: (e) => set({ note: e.target.value }),
+      maxLength: 60,
+      placeholder: "\u043D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434: \u0441\u0443\u043F\u0435\u0440\u0435\u0447\u043A\u0430 \u0449\u043E\u0434\u043E \u043C\u0430\u0440'\u044F\u0436\u0443",
+      style: { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontSize: 13 }
+    }
+  )), /* @__PURE__ */ React.createElement(ErrorBox, { items: errors, T, color: T.danger, icon: /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, color: T.danger, style: { flexShrink: 0, marginTop: 1 } }) }), /* @__PURE__ */ React.createElement(ErrorBox, { items: warnings, T, color: T.warn, icon: /* @__PURE__ */ React.createElement(Info, { size: 15, color: T.warn, style: { flexShrink: 0, marginTop: 1 } }) }), /* @__PURE__ */ React.createElement(SectionLabel, { T }, "5. \u041F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 } }, playersD.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { flex: "1 1 45%", background: T.panelAlt, borderRadius: 12, padding: "9px 11px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted } }, p.displayName), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, fontSize: 17, color: playerColor(game, p.id, T) } }, fmt(finals[p.id]))))), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => canProceed && setConfirming(true),
+      disabled: !canProceed,
+      style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: canProceed ? T.gold : T.border, color: canProceed ? T.bg : T.textMuted, fontWeight: 700, fontSize: 15 }
+    },
+    "\u0414\u0430\u043B\u0456"
+  ));
+}
+function SectionLabel({ children, T }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4, color: T.textMuted, fontWeight: 700, margin: "14px 0 8px" } }, children);
+}
+function RoundConfirm({ T, game, players, form, finals, breakdown, underTargetMessage, roundNumber, onBack, onConfirm, submitting }) {
+  const cumBefore = {};
+  const cumAfter = {};
+  players.forEach((p) => {
+    let before = 0;
+    for (const r of game.rounds) before += r.finals[p.id] || 0;
+    cumBefore[p.id] = before;
+    cumAfter[p.id] = before + (finals[p.id] || 0);
+  });
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18, marginBottom: 14, textAlign: "center" } }, "\u0420\u043E\u0437\u0434\u0430\u0447\u0430 \u2116", roundNumber), underTargetMessage && /* @__PURE__ */ React.createElement("div", { style: { background: T.warnSoft, border: `1px solid ${T.warn}`, borderRadius: 12, padding: "10px 12px", marginBottom: 14, fontSize: 12.5, lineHeight: 1.5 } }, underTargetMessage), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 } }, players.map((p) => {
+    const b = breakdown[p.id];
+    return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: T.panelAlt, borderRadius: 14, padding: "11px 13px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontFamily: "'Fraunces',serif", marginBottom: 4, color: playerColor(game, p.id, T) } }, p.displayName), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: T.textMuted, lineHeight: 1.8 } }, /* @__PURE__ */ React.createElement("div", null, "\u0412\u0437\u044F\u0442\u043A\u0438: ", b.trick), b.combos > 0 && /* @__PURE__ */ React.createElement("div", null, "\u041A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0457: +", b.combos), b.transferred !== 0 && /* @__PURE__ */ React.createElement("div", null, "\u0412\u0456\u0434 \u043D\u0435\u0434\u043E\u0431\u043E\u0440\u0443: ", fmt(b.transferred)), b.capotBonus > 0 && /* @__PURE__ */ React.createElement("div", null, "\u041A\u0430\u043F\u043E\u0442: +", b.capotBonus), b.noTricksPenalty < 0 && /* @__PURE__ */ React.createElement("div", null, "\u041B\u0438\u0436\u0430: ", b.noTricksPenalty), /* @__PURE__ */ React.createElement("div", { style: { color: T.text, fontWeight: 700, borderTop: `1px dashed ${T.border}`, marginTop: 4, paddingTop: 4 } }, "\u0420\u0430\u0437\u043E\u043C: ", fmt(b.final))));
+  })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px dashed ${T.border}`, paddingTop: 12, marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.textMuted, marginBottom: 6 } }, "\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u0440\u0430\u0445\u0443\u043D\u043E\u043A"), players.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { display: "flex", justifyContent: "space-between", fontFamily: "'IBM Plex Mono',monospace", fontSize: 14, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { color: playerColor(game, p.id, T) } }, p.displayName), /* @__PURE__ */ React.createElement("span", null, cumBefore[p.id], " \u2192 ", /* @__PURE__ */ React.createElement("b", null, cumAfter[p.id]))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: onBack, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.textMuted, fontWeight: 600 } }, "\u0417\u043C\u0456\u043D\u0438\u0442\u0438"), /* @__PURE__ */ React.createElement("button", { onClick: onConfirm, disabled: submitting, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: submitting ? 0.6 : 1 } }, /* @__PURE__ */ React.createElement(Check, { size: 17 }), " \u041F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438")));
+}
+function Scoreboard({ T, game, players, evalResult, setName, openAdd, setConfirmUndo, setConfirmNewGame, setEditingRoundId }) {
+  const { cum, finished, winner } = evalResult;
+  const cols = players.length <= 2 ? 1 : 2;
+  return /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px 20px", maxWidth: 480, margin: "0 auto" } }, finished && /* @__PURE__ */ React.createElement("div", { style: { background: T.goldSoft, border: `1px solid ${T.gold}`, borderRadius: 16, padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(Crown, { size: 22, color: T.gold }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontFamily: "'Fraunces',serif" } }, "\u041F\u0430\u0440\u0442\u0456\u044F \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u2014 \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430: ", playerName(game, winner)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.textMuted } }, "\u041F\u043E\u0447\u043D\u0456\u0442\u044C \u043D\u043E\u0432\u0443 \u0433\u0440\u0443, \u0449\u043E\u0431 \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438"))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: players.length === 1 ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 12 } }, players.map((p) => {
+    const isLeader = !finished && cum[p.id] === Math.max(...players.map((q) => cum[q.id])) && players.some((q) => q.id !== p.id && cum[q.id] !== cum[p.id]);
+    const isWinner = finished && winner === p.id;
+    const color = playerColor(game, p.id, T);
+    return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: T.panel, borderRadius: 20, padding: "16px 10px 14px", border: `1.5px solid ${isLeader || isWinner ? T.gold : T.border}`, boxShadow: isLeader || isWinner ? `0 0 0 3px ${T.goldSoft}` : "none", position: "relative", textAlign: "center" } }, (isLeader || isWinner) && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: -11, left: "50%", transform: "translateX(-50%)", background: T.gold, color: T.bg, borderRadius: 999, padding: "2px 10px", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ React.createElement(Crown, { size: 11 }), " ", isWinner ? "\u041F\u0435\u0440\u0435\u043C\u043E\u0433\u0430" : "\u041B\u0456\u0434\u0435\u0440"), /* @__PURE__ */ React.createElement(PlayerNameInput, { value: game.players[p.id] || "", onChange: (v) => setName(p.id, v), T, color: T.text, placeholder: playerName(game, p.id) }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: 40, lineHeight: 1.05, marginTop: 6, color } }, cum[p.id]), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.textMuted, marginTop: 2 } }, "\u043E\u0447\u043E\u043A"));
+  })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: T.textMuted } }, "\u0420\u043E\u0437\u0434\u0430\u0447: ", /* @__PURE__ */ React.createElement("b", { style: { color: T.text } }, game.rounds.length), " \xB7 \u0434\u043E ", game.settings.targetScore), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      disabled: game.rounds.length === 0,
+      onClick: () => setConfirmUndo(true),
+      style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, minHeight: 40, padding: "8px 12px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, color: game.rounds.length ? T.text : T.textMuted, opacity: game.rounds.length ? 1 : 0.5 }
+    },
+    /* @__PURE__ */ React.createElement(Undo2, { size: 14 }),
+    " \u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u043E\u0441\u0442\u0430\u043D\u043D\u044E"
+  )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: T.textMuted, marginBottom: 8, fontWeight: 600 } }, "\u041E\u0441\u0442\u0430\u043D\u043D\u0456 \u0440\u043E\u0437\u0434\u0430\u0447\u0456"), game.rounds.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: T.textMuted, fontSize: 13, padding: "26px 10px", border: `1px dashed ${T.border}`, borderRadius: 16 } }, "\u0420\u043E\u0437\u0434\u0430\u0447 \u0449\u0435 \u043D\u0435 \u0431\u0443\u043B\u043E.", /* @__PURE__ */ React.createElement("br", null), "\u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \xAB+\xBB, \u0449\u043E\u0431 \u0434\u043E\u0434\u0430\u0442\u0438 \u043F\u0435\u0440\u0448\u0443."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, game.rounds.slice(-3).reverse().map((r, i) => /* @__PURE__ */ React.createElement(RoundCard, { key: r.id, r, idx: game.rounds.length - i, T, game, players, compact: true, onEdit: () => setEditingRoundId(r.id) }))), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmNewGame(true), style: { marginTop: 20, width: "100%", minHeight: 46, padding: "12px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.textMuted, fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(RotateCcw, { size: 14 }), " \u041D\u043E\u0432\u0430 \u0433\u0440\u0430"));
+}
+function roundBadges(r, T, game) {
+  const items = [];
+  if (r.callerId) items.push({ t: `\u0417\u0430\u043C\u043E\u0432\u043B\u044F\u0432: ${playerName(game, r.callerId)}`, c: T.textMuted });
+  if (r.underTarget) items.push({ t: "\u041D\u0435\u0434\u043E\u0431\u0456\u0440", c: T.danger });
+  Object.entries(r.rawPerPlayer || {}).forEach(([pid, e]) => {
+    if (e.capot) items.push({ t: `\u041A\u0430\u043F\u043E\u0442: ${playerName(game, pid)}`, c: T.gold });
+    if (e.noTricks) items.push({ t: `\u041B\u0438\u0436\u0430: ${playerName(game, pid)}`, c: T.danger });
+  });
+  if (r.debertsPlayerId && r.debertsConfirmed) items.push({ t: `\u0414\u0435\u0431\u0435\u0440\u0446: ${playerName(game, r.debertsPlayerId)}`, c: T.gold });
+  return items;
+}
+function RoundCard({ r, idx, T, game, players, compact, onEdit }) {
+  const items = roundBadges(r, T, game);
+  return /* @__PURE__ */ React.createElement("div", { style: { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 14, padding: "11px 13px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 600, fontSize: 13.5 } }, "\u0420\u0430\u0437\u0434\u0430\u0447\u0430 \u2116", idx), /* @__PURE__ */ React.createElement("button", { onClick: onEdit, style: { background: "transparent", border: "none", color: T.textMuted, display: "flex", alignItems: "center", gap: 3, fontSize: 11 } }, /* @__PURE__ */ React.createElement(Pencil, { size: 12 }), " ", !compact && "\u0420\u0435\u0434\u0430\u0433\u0443\u0432\u0430\u0442\u0438")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "4px 14px", fontFamily: "'IBM Plex Mono',monospace", fontSize: 13.5 } }, players.map((p) => /* @__PURE__ */ React.createElement("span", { key: p.id, style: { color: playerColor(game, p.id, T) } }, p.displayName || playerName(game, p.id), ": ", fmt(r.finals[p.id])))), items.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 } }, items.map((it, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: { fontSize: 10.5, padding: "3px 8px", borderRadius: 999, background: T.panelAlt, color: it.c, fontWeight: 600 } }, it.t))), r.note && !compact && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginTop: 6, fontStyle: "italic" } }, "\xAB", r.note, "\xBB"));
+}
+function History({ T, game, players, cumTimeline, setEditingRoundId }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { padding: "6px 16px 30px", maxWidth: 480, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18, margin: "8px 0 14px" } }, "\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u0440\u043E\u0437\u0434\u0430\u0447"), game.rounds.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: T.textMuted, fontSize: 13, padding: "30px 10px" } }, "\u041F\u043E\u043A\u0438 \u0449\u043E \u043F\u043E\u0440\u043E\u0436\u043D\u044C\u043E"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, game.rounds.map((r, i) => {
+    const totals = cumTimeline[i] || {};
+    return /* @__PURE__ */ React.createElement("div", { key: r.id, style: { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 16, padding: "13px 15px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 600 } }, "\u0420\u0430\u0437\u0434\u0430\u0447\u0430 \u2116", i + 1), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditingRoundId(r.id), style: { background: T.panelAlt, border: `1px solid ${T.border}`, borderRadius: 8, padding: "5px 9px", display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: T.text } }, /* @__PURE__ */ React.createElement(Pencil, { size: 12 }), " \u0420\u0435\u0434\u0430\u0433\u0443\u0432\u0430\u0442\u0438")), r.callerId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginBottom: 4 } }, "\u0417\u0430\u043C\u043E\u0432\u043B\u044F\u0432: ", playerName(game, r.callerId), r.underTarget ? " \xB7 \u043D\u0435\u0434\u043E\u0431\u0456\u0440" : ""), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 13.5, lineHeight: 1.9 } }, players.map((p) => {
+      const b = r.breakdown ? r.breakdown[p.id] : null;
+      return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { color: playerColor(game, p.id, T) } }, p.displayName, ": \u0432\u0437\u044F\u0442\u043A\u0438 ", b ? b.trick : "\u2014", b && b.combos > 0 ? `, \u043A\u043E\u043C\u0431. +${b.combos}` : "", b && b.capotBonus > 0 ? `, \u043A\u0430\u043F\u043E\u0442 +${b.capotBonus}` : "", b && b.noTricksPenalty < 0 ? `, \u043B\u0438\u0436\u0430 ${b.noTricksPenalty}` : "", " \u2192 ", /* @__PURE__ */ React.createElement("b", null, fmt(r.finals[p.id])));
+    }), /* @__PURE__ */ React.createElement("div", { style: { color: T.textMuted, borderTop: `1px dashed ${T.border}`, marginTop: 6, paddingTop: 6 } }, "\u0420\u0430\u0445\u0443\u043D\u043E\u043A: ", players.map((p) => totals[p.id]).join(" : "))), r.note && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginTop: 6, fontStyle: "italic" } }, "\xAB", r.note, "\xBB"));
+  })));
+}
+function Statistics({ T, game, players, cum }) {
+  const rounds = game.rounds;
+  const n = rounds.length;
+  const Stat = ({ label, value }) => /* @__PURE__ */ React.createElement("div", { style: { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 14, padding: "12px 12px", flex: "1 1 45%" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginBottom: 4 } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18 } }, value));
+  const perPlayer = players.map((p) => {
+    const finalsArr = rounds.map((r) => r.finals[p.id]);
+    const wins = rounds.filter((r) => r.finals[p.id] === Math.max(...players.map((q) => r.finals[q.id]))).length;
+    const calls = rounds.filter((r) => r.callerId === p.id).length;
+    const failedCalls = rounds.filter((r) => r.callerId === p.id && r.underTarget).length;
+    const capots = rounds.filter((r) => r.rawPerPlayer[p.id] && r.rawPerPlayer[p.id].capot).length;
+    const noTricks = rounds.filter((r) => r.rawPerPlayer[p.id] && r.rawPerPlayer[p.id].noTricks).length;
+    const combos = rounds.filter((r) => r.rawPerPlayer[p.id] && (r.rawPerPlayer[p.id].marriage || r.rawPerPlayer[p.id].runCombo)).length;
+    return {
+      id: p.id,
+      name: p.displayName,
+      max: finalsArr.length ? Math.max(...finalsArr) : 0,
+      min: finalsArr.length ? Math.min(...finalsArr) : 0,
+      avg: finalsArr.length ? (finalsArr.reduce((a, b) => a + b, 0) / finalsArr.length).toFixed(1) : "0",
+      wins,
+      calls,
+      failedCalls,
+      capots,
+      noTricks,
+      combos,
+      successRate: calls ? Math.round((calls - failedCalls) / calls * 100) : null
+    };
+  });
+  return /* @__PURE__ */ React.createElement("div", { style: { padding: "6px 16px 30px", maxWidth: 480, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18, margin: "8px 0 14px" } }, "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430 \u043F\u0430\u0440\u0442\u0456\u0457"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 } }, /* @__PURE__ */ React.createElement(Stat, { label: "\u0420\u043E\u0437\u0434\u0430\u0447 \u0437\u0456\u0433\u0440\u0430\u043D\u043E", value: n }), /* @__PURE__ */ React.createElement(Stat, { label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", value: players.map((p) => cum[p.id]).join(" : ") })), perPlayer.map((st) => /* @__PURE__ */ React.createElement("div", { key: st.id, style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 15, marginBottom: 8, color: playerColor(game, st.id, T) } }, st.name), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10 } }, /* @__PURE__ */ React.createElement(Stat, { T, label: "\u041D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0430 \u0440\u043E\u0437\u0434\u0430\u0447\u0430", value: fmt(st.max) }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u041D\u0430\u0439\u043C\u0435\u043D\u0448\u0430 \u0440\u043E\u0437\u0434\u0430\u0447\u0430", value: fmt(st.min) }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u0421\u0435\u0440\u0435\u0434\u043D\u0456\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442", value: st.avg }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u0412\u0438\u0433\u0440\u0430\u043D\u043E \u0440\u043E\u0437\u0434\u0430\u0447", value: st.wins }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u0417\u0430\u043C\u043E\u0432\u043B\u0435\u043D\u044C", value: st.calls }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u0423\u0441\u043F\u0456\u0448\u043D\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043B\u0435\u043D\u044C", value: st.successRate === null ? "\u2014" : `${st.successRate}%` }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u041A\u0430\u043F\u043E\u0442\u0456\u0432", value: st.capots }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u041B\u0438\u0436 (\u0431\u0435\u0437 \u0432\u0437\u044F\u0442\u043E\u043A)", value: st.noTricks }), /* @__PURE__ */ React.createElement(Stat, { T, label: "\u041A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0439", value: st.combos })))));
+}
+function Settings({ T, game, updateSettings, setConfirmNewGame, saveError, onExport, onImport }) {
+  const s = game.settings;
+  const kharkiv = isKharkivPreset(s);
+  const [importText, setImportText] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importError, setImportError] = useState("");
+  return /* @__PURE__ */ React.createElement("div", { style: { padding: "6px 16px 30px", maxWidth: 480, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18, margin: "8px 0 4px" } }, "\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u043F\u0440\u0430\u0432\u0438\u043B"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 16 } }, /* @__PURE__ */ React.createElement(ShieldCheck, { size: 13, color: T.gold }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11.5, color: T.textMuted } }, "\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u0432\u0430\u0440\u0456\u0430\u043D\u0442: ", /* @__PURE__ */ React.createElement("b", { style: { color: T.text } }, kharkiv ? "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0439" : "\u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0446\u044C\u043A\u0438\u0439"))), saveError && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.danger, marginBottom: 12 } }, "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u0431\u0435\u0440\u0435\u0433\u0442\u0438 \u0433\u0440\u0443. \u041F\u0440\u043E\u0433\u0440\u0435\u0441 \u043C\u043E\u0436\u0435 \u043D\u0435 \u0437\u0431\u0435\u0440\u0435\u0433\u0442\u0438\u0441\u044F \u043F\u0456\u0441\u043B\u044F \u0437\u0430\u043A\u0440\u0438\u0442\u0442\u044F."), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement(Label, { T }, "\u0413\u0440\u0430\u0432\u0446\u0456\u0432 \u0443 \u0433\u0440\u0456: ", s.playerCount, " \u2014 \u0437\u043C\u0456\u043D\u044E\u0454\u0442\u044C\u0441\u044F \u0443 \u0434\u0456\u0430\u043B\u043E\u0437\u0456 \xAB\u041D\u043E\u0432\u0430 \u0433\u0440\u0430\xBB")), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement(Label, { T }, "\u0413\u0440\u0430 \u0434\u043E \u0441\u043A\u0456\u043B\u044C\u043A\u043E\u0445 \u043E\u0447\u043E\u043A"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: s.targetScore === 501, onClick: () => updateSettings({ targetScore: 501 }) }, "501 (\u043A\u043B\u0430\u0441\u0438\u043A\u0430)"), /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: s.targetScore === 1001, onClick: () => updateSettings({ targetScore: 1001 }) }, "1001 (\u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0439)"))), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement(Label, { T }, "\u042F\u043A\u0449\u043E \u043A\u0456\u043B\u044C\u043A\u0430 \u0433\u0440\u0430\u0432\u0446\u0456\u0432 \u043E\u0434\u043D\u043E\u0447\u0430\u0441\u043D\u043E \u043F\u0435\u0440\u0435\u0432\u0438\u0449\u0438\u043B\u0438 \u0446\u0456\u043B\u044C"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: s.endCondition === "higher", onClick: () => updateSettings({ endCondition: "higher" }) }, "\u0423 \u043A\u043E\u0433\u043E \u0431\u0456\u043B\u044C\u0448\u0435 \u043E\u0447\u043E\u043A"), /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, disabled: s.playerCount > 2, active: s.endCondition === "lastDefenderWins", onClick: () => updateSettings({ endCondition: "lastDefenderWins" }) }, "\u0425\u0442\u043E \u0437\u0430\u0445\u0438\u0449\u0430\u0432\u0441\u044F \u043E\u0441\u0442\u0430\u043D\u043D\u0456\u043C")), s.playerCount > 2 && /* @__PURE__ */ React.createElement(Help, { T }, "\u041F\u0440\u0430\u0432\u0438\u043B\u043E \xAB\u0445\u0442\u043E \u0437\u0430\u0445\u0438\u0449\u0430\u0432\u0441\u044F \u043E\u0441\u0442\u0430\u043D\u043D\u0456\u043C\xBB \u0437\u0430\u0441\u0442\u043E\u0441\u043E\u0432\u043D\u0435 \u043B\u0438\u0448\u0435 \u0434\u043B\u044F \u0433\u0440\u0438 \u0443\u0434\u0432\u043E\u0445.")), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ React.createElement(Label, { T }, "\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0442\u0438 \u0441\u0443\u043C\u0443 \u043E\u0447\u043E\u043A \u0432\u0437\u044F\u0442\u043E\u043A"), /* @__PURE__ */ React.createElement(Toggle, { checked: s.totalPointsEnabled, onChange: (v) => updateSettings({ totalPointsEnabled: v }), T, color: T.gold })), s.totalPointsEnabled && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, "\u041E\u0447\u043E\u043A \u0437\u0430 \u0440\u043E\u0437\u0434\u0430\u0447\u0443 \u0440\u0430\u0437\u043E\u043C:"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      inputMode: "numeric",
+      value: s.totalPoints,
+      onChange: (e) => updateSettings({ totalPoints: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 }),
+      style: { width: 70, padding: "8px 10px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'IBM Plex Mono',monospace" }
+    }
+  )), /* @__PURE__ */ React.createElement(Help, { T }, "\u0422\u0438\u043F\u043E\u0432\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F 162 (152 \u043E\u0447\u043A\u0438 \u043A\u0430\u0440\u0442 + 10 \u0437\u0430 \u043F\u043E\u0441\u043B\u0456\u0434). \u042F\u043A\u0449\u043E \u0443 \u0432\u0430\u0448\u0456\u0439 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u0440\u0430\u0445\u0443\u044E\u0442\u044C \u0456\u043D\u0430\u043A\u0448\u0435 \u2014 \u0437\u043C\u0456\u043D\u0456\u0442\u044C \u0442\u0443\u0442.")), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement(Label, { T }, "\u041F\u0440\u0430\u0432\u0438\u043B\u043E \u043D\u0435\u0434\u043E\u0431\u043E\u0440\u0443"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 } }, [["all_to_opponent", "\u0423\u0441\u0456 \u043E\u0447\u043A\u0438 \u0440\u043E\u0437\u0434\u0430\u0447\u0456 \u2014 \u0441\u0443\u043F\u0435\u0440\u043D\u0438\u043A\u0430\u043C"], ["trick_only", "\u0421\u0443\u043F\u0435\u0440\u043D\u0438\u043A\u0430\u043C \u2014 \u043B\u0438\u0448\u0435 \u043E\u0447\u043A\u0438 \u0432\u0437\u044F\u0442\u043E\u043A, \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0457 \u0437\u0430\u043B\u0438\u0448\u0430\u044E\u0442\u044C\u0441\u044F"], ["off", "\u041D\u0435 \u0440\u0430\u0445\u0443\u0432\u0430\u0442\u0438 \u043D\u0435\u0434\u043E\u0431\u0456\u0440 \u043E\u043A\u0440\u0435\u043C\u043E"]].map(([val, label]) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: val,
+      onClick: () => updateSettings({ underTargetRule: val }),
+      style: { textAlign: "left", padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${s.underTargetRule === val ? T.gold : T.border}`, background: s.underTargetRule === val ? T.goldSoft : T.panelAlt, color: T.text, fontSize: 13 }
+    },
+    label
+  ))), s.playerCount > 2 && s.underTargetRule !== "off" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Label, { T }, "\u041A\u043E\u043C\u0443 \u0441\u0430\u043C\u0435 \u0439\u0434\u0443\u0442\u044C \u043E\u0447\u043A\u0438 (\u0433\u0440\u0430\u0432\u0446\u0456\u0432 \u0431\u0456\u043B\u044C\u0448\u0435 \u0434\u0432\u043E\u0445)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: s.underTargetDistribution === "highest", onClick: () => updateSettings({ underTargetDistribution: "highest" }) }, "\u041B\u0456\u0434\u0435\u0440\u0443 \u0441\u0435\u0440\u0435\u0434 \u0441\u0443\u043F\u0435\u0440\u043D\u0438\u043A\u0456\u0432"), /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: s.underTargetDistribution === "split", onClick: () => updateSettings({ underTargetDistribution: "split" }) }, "\u041F\u043E\u0440\u0456\u0432\u043D\u0443 \u0432\u0441\u0456\u043C")))), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ React.createElement(Label, { T }, "\u041F\u0440\u0430\u0432\u0438\u043B\u043E \u043A\u0430\u043F\u043E\u0442\u0430"), /* @__PURE__ */ React.createElement(Toggle, { checked: s.capotEnabled, onChange: (v) => updateSettings({ capotEnabled: v }), T, color: T.gold })), s.capotEnabled && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, "\u0411\u043E\u043D\u0443\u0441 \u0437\u0430 \u043A\u0430\u043F\u043E\u0442:"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      inputMode: "numeric",
+      value: s.capotBonus,
+      onChange: (e) => updateSettings({ capotBonus: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 }),
+      style: { width: 70, padding: "8px 10px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'IBM Plex Mono',monospace" }
+    }
+  )), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: s.capotAutoSuggest, onChange: (e) => updateSettings({ capotAutoSuggest: e.target.checked }) }), "\u041F\u0440\u043E\u043F\u043E\u043D\u0443\u0432\u0430\u0442\u0438 \u0432\u0438\u0437\u043D\u0430\u0447\u0438\u0442\u0438 \u043A\u0430\u043F\u043E\u0442 \u0437\u0430 \u0446\u0438\u0444\u0440\u0430\u043C\u0438 (0 : ", s.totalPoints, ")")), /* @__PURE__ */ React.createElement(Help, { T }, "\u0422\u043E\u0447\u043D\u0430 \u0432\u0435\u043B\u0438\u0447\u0438\u043D\u0430 \u0431\u043E\u043D\u0443\u0441\u0443 \u0437\u0430 \u043A\u0430\u043F\u043E\u0442 \u0432\u0456\u0434\u0440\u0456\u0437\u043D\u044F\u0454\u0442\u044C\u0441\u044F \u0443 \u0440\u0456\u0437\u043D\u0438\u0445 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044F\u0445 \u2014 \u0432\u043A\u0430\u0436\u0456\u0442\u044C \u0441\u0432\u043E\u044E.")), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ React.createElement(Label, { T }, "\u041B\u0438\u0436\u0430 (\u0431\u0435\u0437 \u0436\u043E\u0434\u043D\u043E\u0457 \u0432\u0437\u044F\u0442\u043A\u0438)"), /* @__PURE__ */ React.createElement(Toggle, { checked: s.noTricksEnabled, onChange: (v) => updateSettings({ noTricksEnabled: v }), T, color: T.gold })), s.noTricksEnabled && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, "\u0428\u0442\u0440\u0430\u0444:"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      inputMode: "numeric",
+      value: s.noTricksPenalty,
+      onChange: (e) => updateSettings({ noTricksPenalty: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 }),
+      style: { width: 70, padding: "8px 10px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'IBM Plex Mono',monospace" }
+    }
+  )), /* @__PURE__ */ React.createElement(Help, { T }, "\u041F\u043E\u0448\u0438\u0440\u0435\u043D\u0438\u0439 \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0439 \u0432\u0430\u0440\u0456\u0430\u043D\u0442 \u2014 \u043C\u0456\u043D\u0443\u0441 50 \u043E\u0447\u043E\u043A. \u041E\u0447\u043A\u0438 \u0432\u0437\u044F\u0442\u043E\u043A \u043F\u0440\u0438 \u043B\u0438\u0436\u0456 \u0437\u0430\u0432\u0436\u0434\u0438 0 \u2014 \u0446\u0435 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u0442\u044C\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E.")), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement(Label, { T }, "\u0414\u0435\u0431\u0435\u0440\u0446 \u2014 \u043C\u0438\u0442\u0442\u0454\u0432\u0430 \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430"), /* @__PURE__ */ React.createElement(Toggle, { checked: s.debertsInstantWin, onChange: (v) => updateSettings({ debertsInstantWin: v }), T, color: T.gold })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, margin: "8px 0" } }, /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: s.debertsDefinitionKey === "run7", onClick: () => updateSettings({ debertsDefinitionKey: "run7" }) }, "7 \u043A\u0430\u0440\u0442 \u043F\u043E\u0441\u043F\u0456\u043B\u044C"), /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: s.debertsDefinitionKey === "custom", onClick: () => updateSettings({ debertsDefinitionKey: "custom" }) }, "\u0421\u0432\u0456\u0439 \u0432\u0430\u0440\u0456\u0430\u043D\u0442")), s.debertsDefinitionKey === "custom" && /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      value: s.debertsDefinitionCustom,
+      onChange: (e) => updateSettings({ debertsDefinitionCustom: e.target.value }),
+      placeholder: "\u041E\u043F\u0438\u0448\u0456\u0442\u044C, \u0449\u043E \u0441\u0430\u043C\u0435 \u0432\u0432\u0430\u0436\u0430\u0454\u0442\u044C\u0441\u044F \xAB\u0434\u0435\u0431\u0435\u0440\u0446\u0435\u043C\xBB \u0443 \u0432\u0430\u0448\u0456\u0439 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457",
+      rows: 3,
+      style: { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontSize: 13, resize: "vertical" }
+    }
+  ), /* @__PURE__ */ React.createElement(Help, { T }, "\u0426\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u0442\u044C\u0441\u044F \u0433\u0440\u0430\u0432\u0446\u044E \u043F\u0440\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u0456 \xAB\u0414\u0435\u0431\u0435\u0440\u0446\xBB \u0443 \u0440\u043E\u0437\u0434\u0430\u0447\u0456 \u2014 \u0439\u043E\u0433\u043E \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u043E \u044F\u0432\u043D\u043E \u043F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438.")), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement(Label, { T }, "\u0417\u043D\u0430\u0447\u0435\u043D\u043D\u044F \u043A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0439"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [["marriage", "\u041C\u0430\u0440'\u044F\u0436 / \u0431\u0435\u043B\u043B\u0430"], ["terc", "\u0422\u0435\u0440\u0446 (3 \u043A\u0430\u0440\u0442\u0438)"], ["poltinnik", "\u041F\u043E\u043B\u0442\u0438\u043D\u043D\u0438\u043A (4 \u043A\u0430\u0440\u0442\u0438)"], ["sotnya", "\u0421\u043E\u0442\u043D\u044F (5 \u043A\u0430\u0440\u0442)"]].map(([key, label]) => /* @__PURE__ */ React.createElement("div", { key, style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, label), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      inputMode: "numeric",
+      value: s.comboValues[key],
+      onChange: (e) => updateSettings({ comboValues: { ...s.comboValues, [key]: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 } }),
+      style: { width: 64, padding: "7px 8px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'IBM Plex Mono',monospace", textAlign: "center" }
+    }
+  ))))), /* @__PURE__ */ React.createElement(Row, null, /* @__PURE__ */ React.createElement(Label, { T }, "\u041F\u0435\u0440\u0435\u043D\u0435\u0441\u0435\u043D\u043D\u044F \u0433\u0440\u0438"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: onExport, style: { flex: 1, padding: "11px 0", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontWeight: 600, fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(Download, { size: 14 }), " \u0415\u043A\u0441\u043F\u043E\u0440\u0442"), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowImport((v) => !v), style: { flex: 1, padding: "11px 0", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontWeight: 600, fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(Upload, { size: 14 }), " \u0406\u043C\u043F\u043E\u0440\u0442")), showImport && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      value: importText,
+      onChange: (e) => setImportText(e.target.value),
+      placeholder: "\u0412\u0441\u0442\u0430\u0432\u0442\u0435 JSON \u0433\u0440\u0438 \u0441\u044E\u0434\u0438",
+      rows: 4,
+      style: { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", resize: "vertical" }
+    }
+  ), importError && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.danger, marginTop: 6 } }, importError), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        const err = onImport(importText);
+        if (err) setImportError(err);
+        else {
+          setImportError("");
+          setShowImport(false);
+          setImportText("");
+        }
+      },
+      style: { marginTop: 8, width: "100%", padding: "10px 0", borderRadius: 12, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 13 }
+    },
+    "\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0446\u044E \u0433\u0440\u0443"
+  ))), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmNewGame(true), style: { width: "100%", padding: "13px 0", borderRadius: 14, border: `1px solid ${T.danger}`, background: T.dangerSoft, color: T.danger, fontWeight: 700, marginTop: 6, minHeight: 46 } }, "\u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0433\u0440\u0443"));
+}
+function Row({ children }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 18 } }, children);
+}
+function Label({ children }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 6 } }, children);
+}
+function Help({ children, T }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginTop: 6, lineHeight: 1.5 } }, children);
+}
+function ConfirmBlock({ T, title, desc, confirmLabel, onCancel, onConfirm }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "6px 6px 4px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 46, height: 46, borderRadius: "50%", background: T.dangerSoft, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 22, color: T.danger }))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 600, marginBottom: 8 } }, title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, color: T.textMuted, marginBottom: 20, lineHeight: 1.5 } }, desc), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: onCancel, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600 } }, "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438"), /* @__PURE__ */ React.createElement("button", { onClick: onConfirm, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: "none", background: T.danger, color: "#fff", fontWeight: 700 } }, confirmLabel)));
+}
+function TabBtn({ icon, label, active, onClick, T }) {
+  return /* @__PURE__ */ React.createElement("button", { onClick, style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 10px", minWidth: 56, color: active ? T.gold : T.textMuted, background: "transparent", border: "none" } }, icon, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600 } }, label));
+}
+function TallyMark({ T }) {
+  return /* @__PURE__ */ React.createElement("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none" }, /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "19", x2: "4", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "19", x2: "9", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "14", y1: "19", x2: "14", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "1", y1: "6", x2: "17", y2: "20", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("circle", { cx: "20", cy: "13", r: "3.4", stroke: T.gold, strokeWidth: "1.6" }));
+}
+function DebertsCounter() {
+  const [loaded, setLoaded] = useState(false);
+  const [game, setGame] = useState(defaultGame());
+  const [tab, setTab] = useState("game");
+  const [editingRoundId, setEditingRoundId] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [confirmNewGame, setConfirmNewGame] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const firstLoad = useRef(true);
+  const T = THEMES[game.theme] || THEMES.dark;
+  useEffect(() => {
+    (async () => {
+      const saved = await loadGame();
+      if (saved) {
+        setGame({
+          ...defaultGame(),
+          ...saved,
+          settings: { ...defaultSettings(), ...saved.settings || {} },
+          players: { p1: "", p2: "", p3: "", p4: "", ...saved.players || {} }
+        });
+      }
+      setLoaded(true);
+    })();
+  }, []);
+  useEffect(() => {
+    if (!loaded) return;
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      return;
+    }
+    (async () => setSaveError(!await saveGame(game)))();
+  }, [game, loaded]);
+  const players = useMemo(
+    () => playersArray(game).map((p) => ({ ...p, displayName: playerName(game, p.id) })),
+    [game.settings.playerCount, game.players, game.theme]
+  );
+  const evalResult = useMemo(
+    () => evaluateEnd(game.rounds, players, game.settings),
+    [game.rounds, players, game.settings]
+  );
+  const updateSettings = (patch) => setGame((g) => ({ ...g, settings: { ...g.settings, ...patch } }));
+  const setName = (key, val) => setGame((g) => ({ ...g, players: { ...g.players, [key]: val } }));
+  const editingRound = editingRoundId ? { ...game.rounds.find((r) => r.id === editingRoundId), number: game.rounds.findIndex((r) => r.id === editingRoundId) + 1 } : null;
+  const handleSaveRound = (round) => {
+    setGame((g) => {
+      const idx = g.rounds.findIndex((r) => r.id === round.id);
+      const rounds = idx >= 0 ? g.rounds.map((r, i) => i === idx ? round : r) : [...g.rounds, round];
+      return { ...g, rounds };
+    });
+    setShowAdd(false);
+    setEditingRoundId(null);
+  };
+  const undoLast = () => {
+    setGame((g) => ({ ...g, rounds: g.rounds.slice(0, -1) }));
+    setConfirmUndo(false);
+  };
+  const startNewGame = ({ names, settings }) => {
+    setGame((g) => ({ ...defaultGame(), players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, theme: g.theme, setupDone: true }));
+    setConfirmNewGame(false);
+    setTab("game");
+  };
+  const doExport = () => {
+    const data = JSON.stringify(game, null, 2);
+    try {
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `deberts-game-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2e3);
+    } catch (e) {
+      window.prompt("\u0421\u043A\u043E\u043F\u0456\u044E\u0439\u0442\u0435 JSON \u0433\u0440\u0438:", data);
+    }
+  };
+  const doImport = (text) => {
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || !parsed.settings || !Array.isArray(parsed.rounds) || !parsed.players) {
+        return "\u0424\u0430\u0439\u043B \u043D\u0435 \u0441\u0445\u043E\u0436\u0438\u0439 \u043D\u0430 \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u0443 \u0433\u0440\u0443 \u0414\u0435\u0431\u0435\u0440\u0446\u0430.";
+      }
+      setGame({ ...defaultGame(), ...parsed, settings: { ...defaultSettings(), ...parsed.settings } });
+      setTab("game");
+      return null;
+    } catch (e) {
+      return "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u0438 JSON \u2014 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0444\u043E\u0440\u043C\u0430\u0442 \u0444\u0430\u0439\u043B\u0443.";
+    }
+  };
+  if (!loaded) {
+    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: THEMES.dark.bg, color: THEMES.dark.text, fontFamily: "'Inter',sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT), "\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u043F\u0430\u0440\u0442\u0456\u0457\u2026");
+  }
+  if (!game.setupDone && game.rounds.length === 0) {
+    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(120% 100% at 50% -10%, ${T.bgAlt}, ${T.bg})`, color: T.text, fontFamily: "'Inter',sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT), /* @__PURE__ */ React.createElement(PlayerSetup, { T, initial: game, onStart: ({ names, settings }) => {
+      setGame((g) => ({ ...g, players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, setupDone: true }));
+    } }));
+  }
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(120% 100% at 50% -10%, ${T.bgAlt}, ${T.bg})`, color: T.text, fontFamily: "'Inter',sans-serif", paddingBottom: 84 } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT, `::selection{background:${T.gold}55} input:focus,textarea:focus{border-color:${T.gold} !important} @media (orientation:landscape){body{}}`), /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 16px 6px", maxWidth: 480, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TallyMark, { T }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 19 } }, "\u0414\u0435\u0431\u0435\u0440\u0446"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.textMuted, marginTop: 2 } }, "\u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456 \u043F\u0440\u0430\u0432\u0438\u043B\u0430")), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => setGame((g) => ({ ...g, theme: g.theme === "dark" ? "light" : "dark" })),
+      style: { width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, display: "flex", alignItems: "center", justifyContent: "center" }
+    },
+    game.theme === "dark" ? /* @__PURE__ */ React.createElement(Sun, { size: 16, color: T.gold }) : /* @__PURE__ */ React.createElement(Moon, { size: 16, color: T.gold })
+  )), tab === "game" && /* @__PURE__ */ React.createElement(Scoreboard, { T, game, players, evalResult, setName, openAdd: () => setShowAdd(true), setConfirmUndo, setConfirmNewGame, setEditingRoundId }), tab === "history" && /* @__PURE__ */ React.createElement(History, { T, game, players, cumTimeline: evalResult.cumTimeline, setEditingRoundId }), tab === "stats" && /* @__PURE__ */ React.createElement(Statistics, { T, game, players, cum: evalResult.cum }), tab === "settings" && /* @__PURE__ */ React.createElement(Settings, { T, game, updateSettings, setConfirmNewGame, saveError, onExport: doExport, onImport: doImport }), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.panel, borderTop: `1px solid ${T.border}`, display: "flex", padding: "8px 6px calc(8px + env(safe-area-inset-bottom))", justifyContent: "space-around", zIndex: 30 } }, /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(Crown, { size: 19 }), label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", active: tab === "game", onClick: () => setTab("game") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(HistoryIcon, { size: 19 }), label: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F", active: tab === "history", onClick: () => setTab("history") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(BarChart3, { size: 19 }), label: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430", active: tab === "stats", onClick: () => setTab("stats") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(SettingsIcon, { size: 19 }), label: "\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F", active: tab === "settings", onClick: () => setTab("settings") })), tab === "game" && !evalResult.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setShowAdd(true), style: { position: "fixed", right: 18, bottom: 82, width: 60, height: 60, borderRadius: "50%", background: T.gold, color: T.bg, border: "none", boxShadow: T.shadow, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, /* @__PURE__ */ React.createElement(Plus, { size: 26 })), (showAdd || editingRoundId) && /* @__PURE__ */ React.createElement(AddRoundModal, { T, game, players, editingRound, onClose: () => {
+    setShowAdd(false);
+    setEditingRoundId(null);
+  }, onSave: handleSaveRound }), confirmUndo && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmUndo(false) }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u043E\u0441\u0442\u0430\u043D\u043D\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0443?", desc: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A \u043F\u043E\u0432\u0435\u0440\u043D\u0435\u0442\u044C\u0441\u044F \u0434\u043E \u0441\u0442\u0430\u043D\u0443 \u043F\u0435\u0440\u0435\u0434 \u0446\u0456\u0454\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0435\u044E.", confirmLabel: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u0440\u043E\u0437\u0434\u0430\u0447\u0443", onCancel: () => setConfirmUndo(false), onConfirm: undoLast })), confirmNewGame && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmNewGame(false) }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u041F\u043E\u0447\u0430\u0442\u0438 \u043D\u043E\u0432\u0443 \u0433\u0440\u0443?", desc: "\u0423\u0441\u044F \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u0440\u043E\u0437\u0434\u0430\u0447 \u0431\u0443\u0434\u0435 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u0430 \u0431\u0435\u0437\u043F\u043E\u0432\u043E\u0440\u043E\u0442\u043D\u043E. \u0420\u0430\u0434\u0438\u043C\u043E \u0441\u043F\u0435\u0440\u0448\u0443 \u0437\u0440\u043E\u0431\u0438\u0442\u0438 \u0435\u043A\u0441\u043F\u043E\u0440\u0442 \u0433\u0440\u0438.", confirmLabel: "\u0422\u0430\u043A, \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438", onCancel: () => setConfirmNewGame(false), onConfirm: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })) }))), !game.setupDone && game.rounds.length > 0 && null);
+}
+try {
+  const __root = ReactDOM.createRoot(document.getElementById("root"));
+  __root.render(/* @__PURE__ */ React.createElement(DebertsCounter, null));
+} catch (e) {
+  document.getElementById("root").innerHTML = '<div style="padding:24px;color:#F4EEDC;font-family:sans-serif;white-space:pre-wrap;">\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u043F\u0443\u0441\u043A\u0443:\n' + (e && e.message ? e.message : String(e)) + "</div>";
+}
+
+</script>
+</body>
+</html>
