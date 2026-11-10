@@ -536,7 +536,7 @@ function PlayerNameInput({ value, onChange, T, color, placeholder }) {
     }
   );
 }
-function PlayerSetup({ T, initial, onStart }) {
+function PlayerSetup({ T, initial, onStart, onTab }) {
   const [count, setCount] = useState(initial.settings.playerCount || 2);
   const [names, setNames] = useState({ ...initial.players });
   const [variant, setVariant] = useState(initial.settings.rulesVariant || "kharkiv");
@@ -555,7 +555,7 @@ function PlayerSetup({ T, initial, onStart }) {
       maxLength: 16,
       style: { padding: "12px 14px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'Inter',sans-serif", fontSize: 14 }
     }
-  ))), /* @__PURE__ */ React.createElement("button", { onClick: apply, style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 15 } }, "\u041F\u043E\u0447\u0430\u0442\u0438 \u043F\u0430\u0440\u0442\u0456\u044E"));
+  ))), /* @__PURE__ */ React.createElement("button", { onClick: apply, style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 15 } }, "\u041F\u043E\u0447\u0430\u0442\u0438 \u043F\u0430\u0440\u0442\u0456\u044E"), React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 12 } }, React.createElement("button", { onClick: () => onTab && onTab("online"), style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, "\uD83C\uDF10 \u041E\u043D\u043B\u0430\u0439\u043D-\u043A\u0456\u043C\u043D\u0430\u0442\u0430"), React.createElement("button", { onClick: () => onTab && onTab("rules"), style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, "\uD83D\uDCDC \u041F\u0440\u0430\u0432\u0438\u043B\u0430")));
 }
 function AddRoundModal({ T, game, players, editingRound, onClose, onSave }) {
   const s = game.settings;
@@ -874,6 +874,442 @@ function TabBtn({ icon, label, active, onClick, T }) {
 function TallyMark({ T }) {
   return /* @__PURE__ */ React.createElement("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none" }, /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "19", x2: "4", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "19", x2: "9", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "14", y1: "19", x2: "14", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "1", y1: "6", x2: "17", y2: "20", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("circle", { cx: "20", cy: "13", r: "3.4", stroke: T.gold, strokeWidth: "1.6" }));
 }
+/* ===================== ОНЛАЙН-КІМНАТИ (WebSocket) ===================== */
+const hx = React.createElement;
+const SERVER_KEY = "debertz:server";
+const NICK_KEY = "debertz:nick";
+const CLIENT_KEY = "debertz:client";
+function lsGet(k, d) {
+  try { const v = window.localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; }
+}
+function lsSet(k, v) {
+  try { window.localStorage.setItem(k, v); } catch (e) {}
+}
+function getClientId() {
+  let id = lsGet(CLIENT_KEY, "");
+  if (!id) {
+    id = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    lsSet(CLIENT_KEY, id);
+  }
+  return id;
+}
+function defaultServerUrl() {
+  try {
+    if (/^https?:$/.test(location.protocol) && !/github\.io$/i.test(location.hostname)) return location.origin;
+  } catch (e) {}
+  return "";
+}
+function serverBase(raw) {
+  let u = String(raw || "").trim();
+  if (!u) return "";
+  if (!/^[a-z]+:\/\//i.test(u)) {
+    const isLocal = /^(localhost|127\.|\[?::1)/i.test(u);
+    u = (isLocal ? "http://" : "https://") + u;
+  }
+  return u.replace(/\/+$/, "");
+}
+function normalizeGame(g) {
+  return {
+    ...defaultGame(),
+    ...g,
+    settings: { ...defaultSettings(), ...(g.settings || {}) },
+    players: { p1: "", p2: "", p3: "", p4: "", ...(g.players || {}) },
+    rounds: Array.isArray(g.rounds) ? g.rounds : []
+  };
+}
+/* Керування кімнатою. onRemoteGame(g) — застосувати стан з сервера; getLocalGame() — поточна гра. */
+function useRoomNet(onRemoteGame, getLocalGame) {
+  const [status, setStatus] = useState("offline");
+  const [room, setRoom] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const sockRef = useRef(null);
+  const sessionRef = useRef(null);
+  const timerRef = useRef(null);
+  const remoteRef = useRef(onRemoteGame);
+  const localRef = useRef(getLocalGame);
+  remoteRef.current = onRemoteGame;
+  localRef.current = getLocalGame;
+
+  const sendRaw = (msg) => {
+    const ws = sockRef.current;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  };
+  const sendState = (g) => {
+    const s = sessionRef.current;
+    if (!s || !s.code) return;
+    const ws = sockRef.current;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "state", state: g }));
+    else s.dirty = true; // без зв'язку — віддамо свою гру при перепідключенні
+  };
+  const leaveSilently = () => {
+    clearTimeout(timerRef.current);
+    sessionRef.current = null;
+    const ws = sockRef.current;
+    sockRef.current = null;
+    if (ws) {
+      try {
+        if (ws.readyState === 1) ws.send(JSON.stringify({ type: "leave" }));
+        ws.close();
+      } catch (e) {}
+    }
+    setRoom(null);
+    setStatus("offline");
+  };
+  const onMessage = (ws, m) => {
+    switch (m.type) {
+      case "joined": {
+        const s = sessionRef.current;
+        if (!s) return;
+        s.code = m.room.code;
+        s.name = m.room.name;
+        setRoom({ code: m.room.code, name: m.room.name, isPublic: m.room.isPublic, hostId: m.hostId, members: m.members, you: m.you });
+        setNotice(null);
+        if (s.dirty || !m.state) {
+          s.dirty = false;
+          sendRaw({ type: "state", state: localRef.current() });
+        } else {
+          remoteRef.current(normalizeGame(m.state));
+        }
+        return;
+      }
+      case "members":
+        setRoom((r) => (r ? { ...r, members: m.members, hostId: m.hostId } : r));
+        return;
+      case "state":
+        remoteRef.current(normalizeGame(m.game));
+        return;
+      case "closed":
+        sockRef.current = null;
+        sessionRef.current = null;
+        clearTimeout(timerRef.current);
+        try { ws.close(); } catch (e) {}
+        setRoom(null);
+        setStatus("offline");
+        setNotice("Хост закрив кімнату.");
+        return;
+      case "error":
+        if (m.fatal) {
+          sockRef.current = null;
+          sessionRef.current = null;
+          try { ws.close(); } catch (e) {}
+          setRoom(null);
+          setStatus("offline");
+        }
+        setNotice(m.message || "Помилка з'єднання");
+        return;
+      default:
+        return;
+    }
+  };
+  const open = (base, makeFirst, retry) => {
+    clearTimeout(timerRef.current);
+    const ws = new WebSocket(base.replace(/^http/i, "ws"));
+    sockRef.current = ws;
+    setStatus(retry ? "reconnecting" : "connecting");
+    ws.onopen = () => {
+      setStatus("online");
+      ws.send(JSON.stringify(makeFirst()));
+    };
+    ws.onmessage = (ev) => {
+      if (sockRef.current !== ws) return;
+      let m = null;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      onMessage(ws, m);
+    };
+    ws.onclose = () => {
+      if (sockRef.current !== ws) return;
+      sockRef.current = null;
+      const s = sessionRef.current;
+      if (!s) { setStatus("offline"); return; }
+      if (!s.code) {
+        sessionRef.current = null;
+        setRoom(null);
+        setStatus("offline");
+        setNotice("Немає зв'язку з сервером. Перевірте адресу.");
+        return;
+      }
+      setStatus("reconnecting");
+      timerRef.current = setTimeout(() => {
+        const cur = sessionRef.current;
+        if (!cur) return;
+        open(cur.base, () => ({ type: "join", clientId: getClientId(), nickname: cur.nick, code: cur.code }), true);
+      }, 2000);
+    };
+    ws.onerror = () => {};
+  };
+  const createRoom = ({ base, nick, roomName, isPublic }) => {
+    leaveSilently();
+    sessionRef.current = { base, nick, code: null, dirty: false };
+    setNotice(null);
+    open(base, () => ({ type: "create", clientId: getClientId(), nickname: nick, roomName, isPublic }), false);
+  };
+  const joinRoom = ({ base, code, nick }) => {
+    leaveSilently();
+    sessionRef.current = { base, nick, code: null, dirty: false };
+    setNotice(null);
+    open(base, () => ({ type: "join", clientId: getClientId(), nickname: nick, code }), false);
+  };
+  const leave = () => {
+    leaveSilently();
+    setNotice(null);
+  };
+  const closeRoom = () => {
+    sendRaw({ type: "close" });
+    leaveSilently();
+    setNotice("Кімнату закрито.");
+  };
+  return { status, room, notice, setNotice, createRoom, joinRoom, leave, closeRoom, sendState };
+}
+function ConnStatus({ T, status }) {
+  const map = {
+    online: ["#4FB48A", "Зʼєднано з сервером"],
+    connecting: [T.warn, "Підключення…"],
+    reconnecting: [T.warn, "Перепідключення…"],
+    offline: [T.textMuted, "Не в кімнаті"]
+  };
+  const [color, label] = map[status] || map.offline;
+  return hx("div", { style: { fontSize: 12, color, marginBottom: 12, fontWeight: 600 } }, "● ", label);
+}
+function OnlineTab({ T, net, getLocalGame }) {
+  const [server, setServer] = useState(() => {
+    try {
+      const p = new URLSearchParams(location.search).get("server");
+      if (p) return p;
+    } catch (e) {}
+    return lsGet(SERVER_KEY, defaultServerUrl());
+  });
+  const [nick, setNick] = useState(() => lsGet(NICK_KEY, ""));
+  const [roomName, setRoomName] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
+  const [code, setCode] = useState(() => {
+    try { return (new URLSearchParams(location.search).get("room") || "").toUpperCase(); } catch (e) { return ""; }
+  });
+  const [list, setList] = useState(null);
+  const [listErr, setListErr] = useState("");
+  const base = serverBase(server);
+  const nickFinal = nick.trim() || "Гравець";
+  const remember = () => { lsSet(SERVER_KEY, server.trim()); lsSet(NICK_KEY, nick.trim()); };
+  const loadList = async () => {
+    if (!base) { setListErr("Вкажіть адресу сервера."); return; }
+    setListErr("");
+    try {
+      const r = await fetch(base + "/rooms");
+      if (!r.ok) throw new Error("http " + r.status);
+      setList(await r.json());
+    } catch (e) {
+      setList([]);
+      setListErr("Сервер недоступний. Перевірте адресу.");
+    }
+  };
+  useEffect(() => { if (!net.room) loadList(); }, []);
+  const hasProgress = () => getLocalGame().rounds.length > 0;
+  const doCreate = () => {
+    if (!base) { net.setNotice("Вкажіть адресу сервера."); return; }
+    remember();
+    net.createRoom({ base, nick: nickFinal, roomName: roomName.trim() || "Партія " + nickFinal, isPublic });
+  };
+  const doJoin = (c) => {
+    const cc = String(c || code).trim().toUpperCase();
+    if (!base) { net.setNotice("Вкажіть адресу сервера."); return; }
+    if (!cc) { net.setNotice("Введіть код кімнати."); return; }
+    if (hasProgress() && !window.confirm("На цьому пристрої є незавершена гра. Якщо в кімнаті вже є партія, вона замінить вашу. Продовжити?")) return;
+    remember();
+    net.joinRoom({ base, code: cc, nick: nickFinal });
+  };
+
+  const box = { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 18, padding: 16, marginBottom: 14, boxShadow: T.shadow };
+  const input = { width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontSize: 14, fontFamily: "'Inter',sans-serif", outline: "none" };
+  const btn = (primary, extra) => ({ width: "100%", padding: "13px 0", borderRadius: 14, border: primary ? "none" : `1px solid ${T.border}`, background: primary ? T.gold : "transparent", color: primary ? T.bg : T.text, fontWeight: 700, fontSize: 14, ...extra });
+  const label = (t) => hx("div", { style: { fontSize: 12, color: T.textMuted, margin: "12px 0 6px", fontWeight: 600 } }, t);
+  const wrap = { padding: "10px 16px 20px", maxWidth: 480, margin: "0 auto" };
+  const notice = net.notice ? hx("div", { style: { background: T.warnSoft, border: `1px solid ${T.warn}`, borderRadius: 12, padding: "10px 12px", marginBottom: 12, fontSize: 12.5, lineHeight: 1.5 } }, net.notice) : null;
+
+  if (net.room) {
+    const r = net.room;
+    const isHost = r.hostId === r.you;
+    const link = `${location.href.split("?")[0]}?room=${r.code}&server=${encodeURIComponent(base)}`;
+    const copy = () => {
+      const done = () => net.setNotice("Посилання скопійовано.");
+      try { navigator.clipboard.writeText(link).then(done, () => net.setNotice(link)); } catch (e) { net.setNotice(link); }
+    };
+    return hx("div", { style: wrap },
+      hx(ConnStatus, { T, status: net.status }),
+      notice,
+      hx("div", { style: box },
+        hx("div", { style: { fontSize: 12, color: T.textMuted } }, r.isPublic ? "Публічна кімната" : "Приватна кімната"),
+        hx("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 20, marginTop: 2 } }, r.name),
+        hx("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 14, flexWrap: "wrap" } },
+          hx("div", { style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 30, fontWeight: 600, letterSpacing: 6, color: T.gold } }, r.code),
+          hx("button", { onClick: copy, style: { ...btn(false), width: "auto", padding: "9px 14px", fontSize: 12.5 } }, "Копіювати посилання")),
+        hx("div", { style: { fontSize: 12, color: T.textMuted, marginTop: 10, lineHeight: 1.5 } }, "Надішліть код або посилання другому гравцеві. Він побачить той самий рахунок і історію та зможе додавати розділи. Зміни синхронізуються в реальному часі.")),
+      hx("div", { style: box },
+        hx("div", { style: { fontWeight: 700, marginBottom: 6 } }, `Учасники (${r.members.length})`),
+        r.members.map((m) => hx("div", { key: m.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: `1px dashed ${T.border}`, fontSize: 14 } },
+          hx("span", null, "● ", m.name, m.id === r.you ? " (ви)" : ""),
+          m.host ? hx("span", { style: { color: T.gold, fontSize: 11.5, fontWeight: 700 } }, "ХОСТ") : null
+        ))),
+      hx("button", { onClick: net.leave, style: btn(false) }, "Вийти з кімнати"),
+      isHost ? hx("button", { onClick: () => { if (window.confirm("Закрити кімнату для всіх учасників?")) net.closeRoom(); }, style: { ...btn(false), marginTop: 10, color: T.danger, borderColor: T.danger } }, "Закрити кімнату") : null
+    );
+  }
+
+  return hx("div", { style: wrap },
+    hx("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 22 } }, "Онлайн-кімната"),
+    hx("div", { style: { fontSize: 13, color: T.textMuted, margin: "4px 0 14px", lineHeight: 1.5 } }, "Один створює кімнату, другий заходить за кодом. Обидва бачать один рахунок у реальному часі."),
+    hx(ConnStatus, { T, status: net.status }),
+    notice,
+    hx("div", { style: box },
+      label("Адреса сервера"),
+      hx("input", { value: server, onChange: (e) => setServer(e.target.value), placeholder: "наприклад: my-deberts.onrender.com", autoCapitalize: "none", spellCheck: false, style: input }),
+      label("Ваше ім'я"),
+      hx("input", { value: nick, onChange: (e) => setNick(e.target.value), placeholder: "Гравець", maxLength: 16, style: input })
+    ),
+    hx("div", { style: box },
+      hx("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Створити кімнату"),
+      label("Назва кімнати"),
+      hx("input", { value: roomName, onChange: (e) => setRoomName(e.target.value), placeholder: "Вечірній Деберц", maxLength: 24, style: input }),
+      hx("div", { style: { display: "flex", gap: 8, marginTop: 12 } },
+        hx(SegButton, { T, color: T.gold, active: isPublic, onClick: () => setIsPublic(true) }, "Публічна"),
+        hx(SegButton, { T, color: T.gold, active: !isPublic, onClick: () => setIsPublic(false) }, "Приватна")
+      ),
+      hx("div", { style: { fontSize: 11.5, color: T.textMuted, marginTop: 8, lineHeight: 1.5 } }, isPublic ? "Публічну кімнату видно в списку нижче." : "Приватна кімната — лише за кодом або посиланням."),
+      hx("button", { onClick: doCreate, style: { ...btn(true), marginTop: 14 } }, "Створити кімнату")
+    ),
+    hx("div", { style: box },
+      hx("div", { style: { fontWeight: 700, marginBottom: 10 } }, "Приєднатися за кодом"),
+      hx("div", { style: { display: "flex", gap: 8 } },
+        hx("input", { value: code, onChange: (e) => setCode(e.target.value.toUpperCase()), placeholder: "КОД", maxLength: 8, style: { ...input, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 4, textAlign: "center", fontSize: 18, flex: 1 } }),
+        hx("button", { onClick: () => doJoin(), style: { ...btn(true), width: "auto", padding: "0 20px" } }, "Увійти")
+      )
+    ),
+    hx("div", { style: box },
+      hx("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
+        hx("div", { style: { fontWeight: 700 } }, "Публічні кімнати"),
+        hx("button", { onClick: loadList, style: { background: "transparent", border: `1px solid ${T.border}`, color: T.text, borderRadius: 10, padding: "6px 10px", fontSize: 12 } }, "Оновити")
+      ),
+      listErr ? hx("div", { style: { fontSize: 12, color: T.danger, marginBottom: 8 } }, listErr) : null,
+      list && list.length === 0 && !listErr ? hx("div", { style: { fontSize: 13, color: T.textMuted, padding: "6px 0" } }, "Поки немає публічних кімнат. Створіть першу!") : null,
+      (list || []).map((r) => hx("div", { key: r.code, style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px dashed ${T.border}` } },
+        hx("div", { style: { minWidth: 0 } },
+          hx("div", { style: { fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.name),
+          hx("div", { style: { fontSize: 11.5, color: T.textMuted } }, `${r.hostName} · ${r.memberCount} онлайн · ${r.hasGame ? "є партія" : "нова партія"}`)
+        ),
+        hx("button", { onClick: () => doJoin(r.code), style: { ...btn(true), width: "auto", padding: "8px 14px", fontSize: 13, flexShrink: 0 } }, "Увійти")
+      ))
+    )
+  );
+}
+
+/* ===================== ПРАВИЛА (картинки і схеми) ===================== */
+function dzCard(rank, suit, hl) {
+  const red = suit === "♥" || suit === "♦";
+  const ink = red ? "#B3261E" : "#1B2A22";
+  const stroke = hl ? "#D8B26A" : "#8FA596";
+  return `<svg class="dzr-card${hl ? " hl" : ""}" viewBox="0 0 64 90" role="img" aria-label="${rank}${suit}"><rect x="2" y="2" width="60" height="86" rx="9" fill="#FFFCF3" stroke="${stroke}" stroke-width="${hl ? 2.5 : 1.5}"/><text x="9" y="21" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="15" fill="${ink}">${rank}</text><text x="9" y="33" font-size="12" fill="${ink}">${suit}</text><text x="32" y="59" text-anchor="middle" font-size="28" fill="${ink}">${suit}</text><text x="55" y="69" text-anchor="end" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="15" fill="${ink}">${rank}</text><text x="55" y="81" text-anchor="end" font-size="12" fill="${ink}">${suit}</text></svg>`;
+}
+function rulesHtml() {
+  const row = (cards) => `<div class="dzr-row">${cards}</div>`;
+  const tag = (t) => `<span class="dzr-tag">${t}</span>`;
+  const sec = (n, title, body) => `<section class="dzr-sec"><div class="dzr-num">${n}</div><h2>${title}</h2>${body}</section>`;
+  const p = (t) => `<p>${t}</p>`;
+  const combo = (name, desc, cards, value) => `<div class="dzr-combo"><div class="dzr-combo-head"><span>${name}</span><span class="dzr-val">${value}</span></div><div class="dzr-hint">${desc}</div>${row(cards)}</div>`;
+
+  const hero = `<header class="dzr-hero"><div class="dzr-kicker">ДЕБЕРЦ // ПРАВИЛА · 2027</div><h1>Правила гри</h1><p>Харківський варіант. Коротко і наочно.</p></header>`;
+
+  const s1 = sec("01", "Мета гри",
+    p("Гра йде до <b>1001 очка</b>. Після кожної роздачі очки додаються до рахунку. Переможець — той, хто першим перетнув ціль і має більше очок за суперників. Однакова сума — гра триває.") +
+    `<div class="dzr-bar"><i style="width:100%"></i><span style="left:0">0</span><span style="left:50%">501</span><span style="right:0">1001</span></div>`);
+
+  const s2 = sec("02", "Очки карт",
+    row(dzCard("A", "♠") + dzCard("10", "♥") + dzCard("K", "♦") + dzCard("Q", "♣") + dzCard("J", "♠")) +
+    `<div class="dzr-row dzr-tags">${tag("11")}${tag("10")}${tag("4")}${tag("3")}${tag("2")}</div>` +
+    p("Інші карти (6–9) — <b>0 очок</b>. Ліміт очок взяток за роздачу задається в налаштуваннях (типово <b>162</b>: 152 очки карт + 10 за останню взятку)."));
+
+  const s3 = sec("03", "Комбінації",
+    p("Рахується лише <b>найстаріша</b> з ряду терц / полтинник / сотня. Марʼяж можна поєднувати з нею.") +
+    combo("Терц", "3 карти поспіль однієї масті", dzCard("9", "♦") + dzCard("10", "♦") + dzCard("J", "♦"), "+20") +
+    combo("Полтинник", "4 карти поспіль однієї масті", dzCard("9", "♣") + dzCard("10", "♣") + dzCard("J", "♣") + dzCard("Q", "♣"), "+50") +
+    combo("Сотня", "5 карт поспіль однієї масті", dzCard("9", "♠") + dzCard("10", "♠") + dzCard("J", "♠") + dzCard("Q", "♠") + dzCard("K", "♠"), "+100") +
+    combo("Марʼяж · Белла", "Король + дама однієї масті (козирні — белла)", dzCard("K", "♥", true) + dzCard("Q", "♥", true), "+20"));
+
+  const s4 = sec("04", "Деберц",
+    p("<b>7 карт однієї масті поспіль</b> (від сімки до туза) — миттєва перемога. Можна вимкнути в налаштуваннях.") +
+    row(["7", "8", "9", "10", "J", "Q", "K", "A"].map((r) => dzCard(r, "♥", true)).join("")) +
+    `<div class="dzr-tag dzr-tag-big">ДЕБЕРЦ = ПЕРЕМОГА</div>`);
+
+  const s5 = sec("05", "Капот",
+    `<div class="dzr-big">♛</div>` +
+    p("Усі взятки роздачі в <b>одного</b> гравця. Нагорода: <b>+90</b>. Вмикається в налаштуваннях (типово вимкнено). Інші в цій роздачі мають 0 взяток."));
+
+  const s6 = sec("06", "Лижа",
+    `<div class="dzr-flow"><span>0 взяток</span><b>→</b><span class="neg">−50</span></div>` +
+    p("Гравець, що не взяв жодної взятки в роздачі, отримує штраф. Можна вимкнути в налаштуваннях."));
+
+  const s7 = sec("07", "Недобір",
+    p("Якщо замовник не набрав потрібної кількості очок, за обраним правилом його очки переходять суперникам.") +
+    `<div class="dzr-flow"><span>Замовник</span><b>→</b><span>Суперники</span></div>` +
+    `<div class="dzr-hint">Варіанти: <b>всі очки роздачі</b> або <b>лише очки взяток</b> (комбінації лишаються).</div>`);
+
+  const s8 = sec("08", "Підрахунок",
+    `<div class="dzr-formula"><span>взятки</span>+<span>комбінації</span>±<span>капот / лижа</span>±<span>недобір</span>=<b>роздача</b></div>` +
+    p("Сума роздачі додається до рахунку. Деталі кожної роздачі — в «Історії», підсумки — у «Статистиці».") +
+    p("Усі числа й варіанти можна змінити в «Налаштуваннях»."));
+
+  return hero + s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8;
+}
+function rulesCss(T, neon, ng) {
+  return `
+.dzr{--c:${T.gold};--p:${T.panel};--pa:${T.panelAlt};--t:${T.text};--m:${T.textMuted};--b:${T.border};--n:${neon};--ng:${ng};max-width:480px;margin:0 auto;padding:14px 16px 40px;color:var(--t);font-family:Inter,sans-serif}
+.dzr-hero{position:relative;overflow:hidden;border:1px solid var(--n);border-radius:20px;padding:20px 18px 18px;background:linear-gradient(160deg,var(--pa),var(--p));margin-bottom:18px;box-shadow:0 0 0 1px var(--ng),0 0 26px var(--ng)}
+.dzr-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--ng) 1px,transparent 1px),linear-gradient(90deg,var(--ng) 1px,transparent 1px);background-size:22px 22px;opacity:.45;pointer-events:none}
+.dzr-hero::after{content:"";position:absolute;left:0;right:0;height:45%;top:-45%;background:linear-gradient(transparent,var(--ng),transparent);animation:dzscan 5s linear infinite;pointer-events:none}
+.dzr-hero>*{position:relative}
+.dzr-kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--n)}
+.dzr-hero h1{font-family:Fraunces,serif;font-size:30px;margin:6px 0 4px;letter-spacing:.2px}
+.dzr-hero p{margin:0;color:var(--m);font-size:13.5px}
+.dzr-sec{background:var(--p);border:1px solid var(--b);border-top:2px solid var(--n);border-radius:18px;padding:16px 16px 14px;margin-bottom:14px;animation:dzin .5s ease both}
+.dzr-num{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--n);letter-spacing:.14em}
+.dzr-sec h2{font-family:Fraunces,serif;font-size:20px;margin:4px 0 8px}
+.dzr-sec p{font-size:13.5px;line-height:1.6;color:var(--m);margin:8px 0}
+.dzr-sec b{color:var(--t)}
+.dzr-row{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin:12px 0 4px}
+.dzr-tags{margin-top:6px}
+.dzr-card{width:50px;height:auto;filter:drop-shadow(0 5px 6px rgba(0,0,0,.28));transition:transform .2s ease}
+.dzr-card:hover{transform:translateY(-5px) rotate(-2deg)}
+.dzr-card.hl{filter:drop-shadow(0 0 7px var(--ng)) drop-shadow(0 5px 6px rgba(0,0,0,.25))}
+.dzr-tag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--n);color:var(--n);background:var(--ng)}
+.dzr-tag-big{font-size:13px;font-weight:600;margin-top:10px;letter-spacing:.08em}
+.dzr-combo{padding:12px 0 6px;border-top:1px dashed var(--b);margin-top:8px}
+.dzr-combo-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:14.5px}
+.dzr-val{font-family:'IBM Plex Mono',monospace;color:var(--c);font-size:14px}
+.dzr-hint{font-size:12px;color:var(--m);margin-top:3px;line-height:1.5}
+.dzr-bar{position:relative;height:12px;border-radius:99px;background:var(--pa);border:1px solid var(--b);margin:18px 0 24px}
+.dzr-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,var(--n),var(--c));box-shadow:0 0 14px var(--ng)}
+.dzr-bar span{position:absolute;top:18px;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--m)}
+.dzr-bar span:last-child{transform:translateX(0)}
+.dzr-bar span:first-of-type{transform:none}
+.dzr-big{font-size:52px;line-height:1;color:var(--c);text-shadow:0 0 16px var(--ng);margin:4px 0 2px}
+.dzr-flow,.dzr-formula{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:12.5px;margin:12px 0 4px}
+.dzr-flow span,.dzr-formula span{padding:6px 10px;border-radius:10px;border:1px solid var(--b);background:var(--pa)}
+.dzr-flow b,.dzr-formula b{color:var(--n)}
+.dzr-flow .neg{color:#D9695F;border-color:#D9695F}
+.dzr-formula b{color:var(--c)}
+@keyframes dzscan{to{top:110%}}
+@keyframes dzin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.dzr-hero::after,.dzr-sec{animation:none}.dzr-card{transition:none}}
+@media (max-width:360px){.dzr-card{width:44px}}
+`;
+}
+function RulesTab({ T }) {
+  const dark = T.bg === THEMES.dark.bg;
+  const neon = dark ? "#5FE3FF" : "#0E7C9A";
+  const ng = dark ? "rgba(95,227,255,.22)" : "rgba(14,124,154,.18)";
+  return hx("div", null,
+    hx("style", null, rulesCss(T, neon, ng)),
+    hx("div", { className: "dzr", dangerouslySetInnerHTML: { __html: rulesHtml() } })
+  );
+}
+
 function DebertsCounter() {
   const [loaded, setLoaded] = useState(false);
   const [game, setGame] = useState(defaultGame());
@@ -884,6 +1320,8 @@ function DebertsCounter() {
   const [confirmUndo, setConfirmUndo] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const firstLoad = useRef(true);
+  const lastRemoteRef = useRef(null);
+  const net = useRoomNet((g) => { lastRemoteRef.current = g; setGame(g); }, () => game);
   const T = THEMES[game.theme] || THEMES.dark;
   useEffect(() => {
     (async () => {
@@ -907,6 +1345,11 @@ function DebertsCounter() {
     }
     (async () => setSaveError(!await saveGame(game)))();
   }, [game, loaded]);
+  useEffect(() => {
+    // Локальна зміна (не та, що прийшла з сервера) — надсилаємо в кімнату.
+    if (!loaded || game === lastRemoteRef.current) return;
+    net.sendState(game);
+  }, [game]);
   const players = useMemo(
     () => playersArray(game).map((p) => ({ ...p, displayName: playerName(game, p.id) })),
     [game.settings.playerCount, game.players, game.theme]
@@ -968,8 +1411,8 @@ function DebertsCounter() {
   if (!loaded) {
     return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: THEMES.dark.bg, color: THEMES.dark.text, fontFamily: "'Inter',sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT), "\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u043F\u0430\u0440\u0442\u0456\u0457\u2026");
   }
-  if (!game.setupDone && game.rounds.length === 0) {
-    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(120% 100% at 50% -10%, ${T.bgAlt}, ${T.bg})`, color: T.text, fontFamily: "'Inter',sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT), /* @__PURE__ */ React.createElement(PlayerSetup, { T, initial: game, onStart: ({ names, settings }) => {
+  if (!game.setupDone && game.rounds.length === 0 && tab !== "online" && tab !== "rules") {
+    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(120% 100% at 50% -10%, ${T.bgAlt}, ${T.bg})`, color: T.text, fontFamily: "'Inter',sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT), /* @__PURE__ */ React.createElement(PlayerSetup, { T, initial: game, onTab: setTab, onStart: ({ names, settings }) => {
       setGame((g) => ({ ...g, players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, setupDone: true }));
     } }));
   }
@@ -980,7 +1423,7 @@ function DebertsCounter() {
       style: { width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, display: "flex", alignItems: "center", justifyContent: "center" }
     },
     game.theme === "dark" ? /* @__PURE__ */ React.createElement(Sun, { size: 16, color: T.gold }) : /* @__PURE__ */ React.createElement(Moon, { size: 16, color: T.gold })
-  )), tab === "game" && /* @__PURE__ */ React.createElement(Scoreboard, { T, game, players, evalResult, setName, openAdd: () => setShowAdd(true), setConfirmUndo, setConfirmNewGame, setEditingRoundId }), tab === "history" && /* @__PURE__ */ React.createElement(History, { T, game, players, cumTimeline: evalResult.cumTimeline, setEditingRoundId }), tab === "stats" && /* @__PURE__ */ React.createElement(Statistics, { T, game, players, cum: evalResult.cum }), tab === "settings" && /* @__PURE__ */ React.createElement(Settings, { T, game, updateSettings, setConfirmNewGame, saveError, onExport: doExport, onImport: doImport }), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.panel, borderTop: `1px solid ${T.border}`, display: "flex", padding: "8px 6px calc(8px + env(safe-area-inset-bottom))", justifyContent: "space-around", zIndex: 30 } }, /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(Crown, { size: 19 }), label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", active: tab === "game", onClick: () => setTab("game") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(HistoryIcon, { size: 19 }), label: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F", active: tab === "history", onClick: () => setTab("history") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(BarChart3, { size: 19 }), label: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430", active: tab === "stats", onClick: () => setTab("stats") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(SettingsIcon, { size: 19 }), label: "\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F", active: tab === "settings", onClick: () => setTab("settings") })), tab === "game" && !evalResult.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setShowAdd(true), style: { position: "fixed", right: 18, bottom: 82, width: 60, height: 60, borderRadius: "50%", background: T.gold, color: T.bg, border: "none", boxShadow: T.shadow, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, /* @__PURE__ */ React.createElement(Plus, { size: 26 })), (showAdd || editingRoundId) && /* @__PURE__ */ React.createElement(AddRoundModal, { T, game, players, editingRound, onClose: () => {
+  )), tab === "game" && /* @__PURE__ */ React.createElement(Scoreboard, { T, game, players, evalResult, setName, openAdd: () => setShowAdd(true), setConfirmUndo, setConfirmNewGame, setEditingRoundId }), tab === "history" && /* @__PURE__ */ React.createElement(History, { T, game, players, cumTimeline: evalResult.cumTimeline, setEditingRoundId }), tab === "stats" && /* @__PURE__ */ React.createElement(Statistics, { T, game, players, cum: evalResult.cum }), tab === "online" && hx(OnlineTab, { T, net, getLocalGame: () => game }), tab === "rules" && hx(RulesTab, { T }), tab === "settings" && /* @__PURE__ */ React.createElement(Settings, { T, game, updateSettings, setConfirmNewGame, saveError, onExport: doExport, onImport: doImport }), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.panel, borderTop: `1px solid ${T.border}`, display: "flex", padding: "8px 6px calc(8px + env(safe-area-inset-bottom))", justifyContent: "space-around", zIndex: 30 } }, /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(Crown, { size: 19 }), label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", active: tab === "game", onClick: () => setTab("game") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(HistoryIcon, { size: 19 }), label: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F", active: tab === "history", onClick: () => setTab("history") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(BarChart3, { size: 19 }), label: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430", active: tab === "stats", onClick: () => setTab("stats") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(IconBase, { glyph: net.room ? "◉" : "○", size: 19, color: net.room ? "#4FB48A" : T.textMuted }), label: "Онлайн", active: tab === "online", onClick: () => setTab("online") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(IconBase, { glyph: "\u{1F4D6}", size: 19 }), label: "Правила", active: tab === "rules", onClick: () => setTab("rules") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(SettingsIcon, { size: 19 }), label: "\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F", active: tab === "settings", onClick: () => setTab("settings") })), tab === "game" && !evalResult.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setShowAdd(true), style: { position: "fixed", right: 18, bottom: 82, width: 60, height: 60, borderRadius: "50%", background: T.gold, color: T.bg, border: "none", boxShadow: T.shadow, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, /* @__PURE__ */ React.createElement(Plus, { size: 26 })), (showAdd || editingRoundId) && /* @__PURE__ */ React.createElement(AddRoundModal, { T, game, players, editingRound, onClose: () => {
     setShowAdd(false);
     setEditingRoundId(null);
   }, onSave: handleSaveRound }), confirmUndo && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmUndo(false) }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u043E\u0441\u0442\u0430\u043D\u043D\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0443?", desc: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A \u043F\u043E\u0432\u0435\u0440\u043D\u0435\u0442\u044C\u0441\u044F \u0434\u043E \u0441\u0442\u0430\u043D\u0443 \u043F\u0435\u0440\u0435\u0434 \u0446\u0456\u0454\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0435\u044E.", confirmLabel: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u0440\u043E\u0437\u0434\u0430\u0447\u0443", onCancel: () => setConfirmUndo(false), onConfirm: undoLast })), confirmNewGame && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmNewGame(false) }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u041F\u043E\u0447\u0430\u0442\u0438 \u043D\u043E\u0432\u0443 \u0433\u0440\u0443?", desc: "\u0423\u0441\u044F \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u0440\u043E\u0437\u0434\u0430\u0447 \u0431\u0443\u0434\u0435 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u0430 \u0431\u0435\u0437\u043F\u043E\u0432\u043E\u0440\u043E\u0442\u043D\u043E. \u0420\u0430\u0434\u0438\u043C\u043E \u0441\u043F\u0435\u0440\u0448\u0443 \u0437\u0440\u043E\u0431\u0438\u0442\u0438 \u0435\u043A\u0441\u043F\u043E\u0440\u0442 \u0433\u0440\u0438.", confirmLabel: "\u0422\u0430\u043A, \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438", onCancel: () => setConfirmNewGame(false), onConfirm: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })) }))), !game.setupDone && game.rounds.length > 0 && null);
