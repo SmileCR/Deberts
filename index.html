@@ -17,6 +17,7 @@
 </style>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 </head>
 <body>
 <div id="root"><div id="boot">Завантаження…</div></div>
@@ -874,11 +875,14 @@ function TabBtn({ icon, label, active, onClick, T }) {
 function TallyMark({ T }) {
   return /* @__PURE__ */ React.createElement("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none" }, /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "19", x2: "4", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "19", x2: "9", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "14", y1: "19", x2: "14", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "1", y1: "6", x2: "17", y2: "20", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("circle", { cx: "20", cy: "13", r: "3.4", stroke: T.gold, strokeWidth: "1.6" }));
 }
-/* ===================== ОНЛАЙН-КІМНАТИ (WebSocket) ===================== */
+/* ===================== ОНЛАЙН-КІМНАТИ (Supabase Realtime) ===================== */
 const hx = React.createElement;
-const SERVER_KEY = "debertz:server";
+const SB_URL = "https://zzsyvlwpasofedpuarnt.supabase.co";
+const SB_KEY = "sb_publishable_jQ0o_7AO5qlE5LyCmoz7-w_4a2SDdA8";
 const NICK_KEY = "debertz:nick";
 const CLIENT_KEY = "debertz:client";
+const LOBBY_TOPIC = "deberts:lobby";
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 function lsGet(k, d) {
   try { const v = window.localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; }
 }
@@ -893,20 +897,12 @@ function getClientId() {
   }
   return id;
 }
-function defaultServerUrl() {
-  try {
-    if (/^https?:$/.test(location.protocol) && !/github\.io$/i.test(location.hostname)) return location.origin;
-  } catch (e) {}
-  return "";
-}
-function serverBase(raw) {
-  let u = String(raw || "").trim();
-  if (!u) return "";
-  if (!/^[a-z]+:\/\//i.test(u)) {
-    const isLocal = /^(localhost|127\.|\[?::1)/i.test(u);
-    u = (isLocal ? "http://" : "https://") + u;
-  }
-  return u.replace(/\/+$/, "");
+function makeRoomCode() {
+  const bytes = new Uint8Array(6);
+  (window.crypto || window.msCrypto).getRandomValues(bytes);
+  let code = "";
+  for (let i = 0; i < 6; i++) code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  return code;
 }
 function normalizeGame(g) {
   return {
@@ -917,152 +913,204 @@ function normalizeGame(g) {
     rounds: Array.isArray(g.rounds) ? g.rounds : []
   };
 }
-/* Керування кімнатою. onRemoteGame(g) — застосувати стан з сервера; getLocalGame() — поточна гра. */
+let sbClient = null;
+function getSb() {
+  if (!sbClient) sbClient = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
+  return sbClient;
+}
+/* Учасники кімнати з presence-стану, у порядку приєднання. */
+function membersFromPresence(ch) {
+  const st = ch.presenceState();
+  const seen = {};
+  const out = [];
+  Object.keys(st).forEach((k) => st[k].forEach((m) => {
+    if (m && m.id && !seen[m.id]) {
+      seen[m.id] = true;
+      out.push(m);
+    }
+  }));
+  out.sort((a, b) => (a.at || 0) - (b.at || 0));
+  return out;
+}
+/* Керування кімнатою. onRemoteGame(g) — застосувати стан з кімнати; getLocalGame() — поточна гра. */
 function useRoomNet(onRemoteGame, getLocalGame) {
   const [status, setStatus] = useState("offline");
   const [room, setRoom] = useState(null);
   const [notice, setNotice] = useState(null);
-  const sockRef = useRef(null);
+  const [lobbyRooms, setLobbyRooms] = useState([]);
+  const chRef = useRef(null);
   const sessionRef = useRef(null);
-  const timerRef = useRef(null);
+  const lobbyRef = useRef(null);
+  const lobbyReadyRef = useRef(false);
+  const lobbyMetaRef = useRef(null);
   const remoteRef = useRef(onRemoteGame);
   const localRef = useRef(getLocalGame);
   remoteRef.current = onRemoteGame;
   localRef.current = getLocalGame;
 
-  const sendRaw = (msg) => {
-    const ws = sockRef.current;
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  /* Lobby: публічні кімнати = presence у спільному каналі. */
+  const lobbySync = () => {
+    const ch = lobbyRef.current;
+    if (!ch) return;
+    const st = ch.presenceState();
+    const byCode = {};
+    Object.keys(st).forEach((k) => st[k].forEach((m) => { if (m && m.code) byCode[m.code] = m; }));
+    setLobbyRooms(Object.values(byCode));
   };
-  const sendState = (g) => {
-    const s = sessionRef.current;
-    if (!s || !s.code) return;
-    const ws = sockRef.current;
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "state", state: g }));
-    else s.dirty = true; // без зв'язку — віддамо свою гру при перепідключенні
+  useEffect(() => {
+    const sb = getSb();
+    const ch = sb.channel(LOBBY_TOPIC, { config: { presence: { key: getClientId() } } });
+    lobbyRef.current = ch;
+    ch.on("presence", { event: "sync" }, lobbySync)
+      .subscribe(async (st) => {
+        if (st === "SUBSCRIBED") {
+          lobbyReadyRef.current = true;
+          lobbySync();
+          if (lobbyMetaRef.current) await ch.track(lobbyMetaRef.current);
+        } else {
+          lobbyReadyRef.current = false;
+        }
+      });
+    return () => {
+      lobbyReadyRef.current = false;
+      lobbyRef.current = null;
+      sb.removeChannel(ch);
+    };
+  }, []);
+  const setLobbyMeta = (meta) => {
+    lobbyMetaRef.current = meta;
+    const ch = lobbyRef.current;
+    if (!ch || !lobbyReadyRef.current) return;
+    if (meta) ch.track(meta);
+    else ch.untrack();
   };
-  const leaveSilently = () => {
-    clearTimeout(timerRef.current);
+
+  const teardown = () => {
+    const ch = chRef.current;
+    chRef.current = null;
     sessionRef.current = null;
-    const ws = sockRef.current;
-    sockRef.current = null;
-    if (ws) {
-      try {
-        if (ws.readyState === 1) ws.send(JSON.stringify({ type: "leave" }));
-        ws.close();
-      } catch (e) {}
+    if (ch) {
+      try { ch.untrack(); } catch (e) {}
+      try { getSb().removeChannel(ch); } catch (e) {}
     }
+    setLobbyMeta(null);
     setRoom(null);
     setStatus("offline");
   };
-  const onMessage = (ws, m) => {
-    switch (m.type) {
-      case "joined": {
-        const s = sessionRef.current;
-        if (!s) return;
-        s.code = m.room.code;
-        s.name = m.room.name;
-        setRoom({ code: m.room.code, name: m.room.name, isPublic: m.room.isPublic, hostId: m.hostId, members: m.members, you: m.you });
-        setNotice(null);
-        if (s.dirty || !m.state) {
-          s.dirty = false;
-          sendRaw({ type: "state", state: localRef.current() });
-        } else {
-          remoteRef.current(normalizeGame(m.state));
-        }
-        return;
-      }
-      case "members":
-        setRoom((r) => (r ? { ...r, members: m.members, hostId: m.hostId } : r));
-        return;
-      case "state":
-        remoteRef.current(normalizeGame(m.game));
-        return;
-      case "closed":
-        sockRef.current = null;
-        sessionRef.current = null;
-        clearTimeout(timerRef.current);
-        try { ws.close(); } catch (e) {}
-        setRoom(null);
-        setStatus("offline");
-        setNotice("Хост закрив кімнату.");
-        return;
-      case "error":
-        if (m.fatal) {
-          sockRef.current = null;
-          sessionRef.current = null;
-          try { ws.close(); } catch (e) {}
-          setRoom(null);
-          setStatus("offline");
-        }
-        setNotice(m.message || "Помилка з'єднання");
-        return;
-      default:
-        return;
-    }
+
+  const sendState = (g) => {
+    const s = sessionRef.current;
+    const ch = chRef.current;
+    if (!s || !ch) return;
+    if (s.subscribed) ch.send({ type: "broadcast", event: "state", payload: { game: g } });
+    else s.dirty = true;
   };
-  const open = (base, makeFirst, retry) => {
-    clearTimeout(timerRef.current);
-    const ws = new WebSocket(base.replace(/^http/i, "ws"));
-    sockRef.current = ws;
-    setStatus(retry ? "reconnecting" : "connecting");
-    ws.onopen = () => {
-      setStatus("online");
-      ws.send(JSON.stringify(makeFirst()));
-    };
-    ws.onmessage = (ev) => {
-      if (sockRef.current !== ws) return;
-      let m = null;
-      try { m = JSON.parse(ev.data); } catch (e) { return; }
-      onMessage(ws, m);
-    };
-    ws.onclose = () => {
-      if (sockRef.current !== ws) return;
-      sockRef.current = null;
-      const s = sessionRef.current;
-      if (!s) { setStatus("offline"); return; }
-      if (!s.code) {
-        sessionRef.current = null;
-        setRoom(null);
-        setStatus("offline");
-        setNotice("Немає зв'язку з сервером. Перевірте адресу.");
-        return;
-      }
-      setStatus("reconnecting");
-      timerRef.current = setTimeout(() => {
-        const cur = sessionRef.current;
-        if (!cur) return;
-        open(cur.base, () => ({ type: "join", clientId: getClientId(), nickname: cur.nick, code: cur.code }), true);
-      }, 2000);
-    };
-    ws.onerror = () => {};
-  };
-  const createRoom = ({ base, nick, roomName, isPublic }) => {
-    leaveSilently();
-    sessionRef.current = { base, nick, code: null, dirty: false };
+
+  const enter = (code, nick, isHost, isPublic, roomName, awaitState) => {
+    const cid = getClientId();
+    const sb = getSb();
+    const s = { code, cid, subscribed: false, dirty: false, joined: false, helloTimer: null, awaitState };
+    sessionRef.current = s;
+    setStatus("connecting");
     setNotice(null);
-    open(base, () => ({ type: "create", clientId: getClientId(), nickname: nick, roomName, isPublic }), false);
+    const ch = sb.channel("deberts:room:" + code, { config: { presence: { key: cid }, broadcast: { self: false } } });
+    chRef.current = ch;
+
+    const syncRoom = () => {
+      if (chRef.current !== ch) return;
+      const members = membersFromPresence(ch);
+      const info = members.find((m) => m.roomName) || {};
+      const hostM = members.find((m) => m.host) || members[0];
+      setRoom({
+        code,
+        name: info.roomName || "Партія",
+        isPublic: !!info.isPublic,
+        you: cid,
+        hostId: hostM ? hostM.id : null,
+        members: members.map((m) => ({ id: m.id, name: m.name, host: m.id === (hostM && hostM.id) }))
+      });
+      if (info.isPublic) {
+        setLobbyMeta({ code, name: info.roomName || "Партія", hostName: hostM ? hostM.name : "", count: members.length, hasGame: true, isPublic: true });
+      }
+    };
+    ch.on("presence", { event: "sync" }, syncRoom);
+    ch.on("broadcast", { event: "state" }, ({ payload }) => {
+      if (chRef.current !== ch || !payload || !payload.game) return;
+      s.awaitState = false;
+      if (s.helloTimer) { clearTimeout(s.helloTimer); s.helloTimer = null; }
+      remoteRef.current(normalizeGame(payload.game));
+    });
+    ch.on("broadcast", { event: "hello" }, () => {
+      if (chRef.current !== ch) return;
+      ch.send({ type: "broadcast", event: "state", payload: { game: localRef.current() } });
+    });
+    ch.on("broadcast", { event: "closed" }, () => {
+      if (chRef.current !== ch) return;
+      teardown();
+      setNotice("Хост закрив кімнату.");
+    });
+
+    ch.subscribe(async (st) => {
+      if (chRef.current !== ch) return;
+      if (st === "SUBSCRIBED") {
+        s.subscribed = true;
+        await ch.track({ id: cid, name: nick, host: isHost, at: Date.now(), roomName, isPublic });
+        setStatus("online");
+        if (s.joined) {
+          // Перепідключення: повертаємо свої незбережені зміни.
+          if (s.dirty) {
+            s.dirty = false;
+            ch.send({ type: "broadcast", event: "state", payload: { game: localRef.current() } });
+          }
+          return;
+        }
+        s.joined = true;
+        if (isHost) return;
+        // Гість: чекаємо, поки хтось у кімнаті не відповість.
+        setTimeout(() => {
+          if (chRef.current !== ch) return;
+          const others = membersFromPresence(ch).filter((m) => m.id !== cid).length;
+          if (others === 0) {
+            teardown();
+            setNotice("Кімнату з таким кодом не знайдено.");
+            return;
+          }
+          ch.send({ type: "broadcast", event: "hello", payload: {} });
+        }, 700);
+      } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
+        s.subscribed = false;
+        if (chRef.current === ch) setStatus("reconnecting");
+      }
+    });
   };
-  const joinRoom = ({ base, code, nick }) => {
-    leaveSilently();
-    sessionRef.current = { base, nick, code: null, dirty: false };
+
+  const createRoom = ({ nick, roomName, isPublic }) => {
+    teardown();
     setNotice(null);
-    open(base, () => ({ type: "join", clientId: getClientId(), nickname: nick, code }), false);
+    enter(makeRoomCode(), nick, true, isPublic, roomName, false);
+  };
+  const joinRoom = ({ code, nick }) => {
+    teardown();
+    setNotice(null);
+    enter(code, nick, false, false, "", true);
   };
   const leave = () => {
-    leaveSilently();
+    teardown();
     setNotice(null);
   };
-  const closeRoom = () => {
-    sendRaw({ type: "close" });
-    leaveSilently();
+  const closeRoom = async () => {
+    const ch = chRef.current;
+    if (ch) {
+      try { await ch.send({ type: "broadcast", event: "closed", payload: {} }); } catch (e) {}
+    }
+    teardown();
     setNotice("Кімнату закрито.");
   };
-  return { status, room, notice, setNotice, createRoom, joinRoom, leave, closeRoom, sendState };
+  return { status, room, notice, setNotice, lobbyRooms, createRoom, joinRoom, leave, closeRoom, sendState };
 }
 function ConnStatus({ T, status }) {
   const map = {
-    online: ["#4FB48A", "Зʼєднано з сервером"],
+    online: ["#4FB48A", "Зʼєднано"],
     connecting: [T.warn, "Підключення…"],
     reconnecting: [T.warn, "Перепідключення…"],
     offline: [T.textMuted, "Не в кімнаті"]
@@ -1071,50 +1119,25 @@ function ConnStatus({ T, status }) {
   return hx("div", { style: { fontSize: 12, color, marginBottom: 12, fontWeight: 600 } }, "● ", label);
 }
 function OnlineTab({ T, net, getLocalGame }) {
-  const [server, setServer] = useState(() => {
-    try {
-      const p = new URLSearchParams(location.search).get("server");
-      if (p) return p;
-    } catch (e) {}
-    return lsGet(SERVER_KEY, defaultServerUrl());
-  });
   const [nick, setNick] = useState(() => lsGet(NICK_KEY, ""));
   const [roomName, setRoomName] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [code, setCode] = useState(() => {
     try { return (new URLSearchParams(location.search).get("room") || "").toUpperCase(); } catch (e) { return ""; }
   });
-  const [list, setList] = useState(null);
-  const [listErr, setListErr] = useState("");
-  const base = serverBase(server);
   const nickFinal = nick.trim() || "Гравець";
-  const remember = () => { lsSet(SERVER_KEY, server.trim()); lsSet(NICK_KEY, nick.trim()); };
-  const loadList = async () => {
-    if (!base) { setListErr("Вкажіть адресу сервера."); return; }
-    setListErr("");
-    try {
-      const r = await fetch(base + "/rooms");
-      if (!r.ok) throw new Error("http " + r.status);
-      setList(await r.json());
-    } catch (e) {
-      setList([]);
-      setListErr("Сервер недоступний. Перевірте адресу.");
-    }
-  };
-  useEffect(() => { if (!net.room) loadList(); }, []);
+  const remember = () => lsSet(NICK_KEY, nick.trim());
   const hasProgress = () => getLocalGame().rounds.length > 0;
   const doCreate = () => {
-    if (!base) { net.setNotice("Вкажіть адресу сервера."); return; }
     remember();
-    net.createRoom({ base, nick: nickFinal, roomName: roomName.trim() || "Партія " + nickFinal, isPublic });
+    net.createRoom({ nick: nickFinal, roomName: roomName.trim() || "Партія " + nickFinal, isPublic });
   };
   const doJoin = (c) => {
     const cc = String(c || code).trim().toUpperCase();
-    if (!base) { net.setNotice("Вкажіть адресу сервера."); return; }
     if (!cc) { net.setNotice("Введіть код кімнати."); return; }
     if (hasProgress() && !window.confirm("На цьому пристрої є незавершена гра. Якщо в кімнаті вже є партія, вона замінить вашу. Продовжити?")) return;
     remember();
-    net.joinRoom({ base, code: cc, nick: nickFinal });
+    net.joinRoom({ code: cc, nick: nickFinal });
   };
 
   const box = { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 18, padding: 16, marginBottom: 14, boxShadow: T.shadow };
@@ -1127,7 +1150,7 @@ function OnlineTab({ T, net, getLocalGame }) {
   if (net.room) {
     const r = net.room;
     const isHost = r.hostId === r.you;
-    const link = `${location.href.split("?")[0]}?room=${r.code}&server=${encodeURIComponent(base)}`;
+    const link = `${location.href.split("?")[0]}?room=${r.code}`;
     const copy = () => {
       const done = () => net.setNotice("Посилання скопійовано.");
       try { navigator.clipboard.writeText(link).then(done, () => net.setNotice(link)); } catch (e) { net.setNotice(link); }
@@ -1153,14 +1176,14 @@ function OnlineTab({ T, net, getLocalGame }) {
     );
   }
 
+  const seen = {};
+  const list = (net.lobbyRooms || []).filter((r) => { if (seen[r.code]) return false; seen[r.code] = true; return true; });
   return hx("div", { style: wrap },
     hx("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 22 } }, "Онлайн-кімната"),
     hx("div", { style: { fontSize: 13, color: T.textMuted, margin: "4px 0 14px", lineHeight: 1.5 } }, "Один створює кімнату, другий заходить за кодом. Обидва бачать один рахунок у реальному часі."),
     hx(ConnStatus, { T, status: net.status }),
     notice,
     hx("div", { style: box },
-      label("Адреса сервера"),
-      hx("input", { value: server, onChange: (e) => setServer(e.target.value), placeholder: "наприклад: my-deberts.onrender.com", autoCapitalize: "none", spellCheck: false, style: input }),
       label("Ваше ім'я"),
       hx("input", { value: nick, onChange: (e) => setNick(e.target.value), placeholder: "Гравець", maxLength: 16, style: input })
     ),
@@ -1183,16 +1206,12 @@ function OnlineTab({ T, net, getLocalGame }) {
       )
     ),
     hx("div", { style: box },
-      hx("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
-        hx("div", { style: { fontWeight: 700 } }, "Публічні кімнати"),
-        hx("button", { onClick: loadList, style: { background: "transparent", border: `1px solid ${T.border}`, color: T.text, borderRadius: 10, padding: "6px 10px", fontSize: 12 } }, "Оновити")
-      ),
-      listErr ? hx("div", { style: { fontSize: 12, color: T.danger, marginBottom: 8 } }, listErr) : null,
-      list && list.length === 0 && !listErr ? hx("div", { style: { fontSize: 13, color: T.textMuted, padding: "6px 0" } }, "Поки немає публічних кімнат. Створіть першу!") : null,
-      (list || []).map((r) => hx("div", { key: r.code, style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px dashed ${T.border}` } },
+      hx("div", { style: { fontWeight: 700, marginBottom: 6 } }, "Публічні кімнати"),
+      list.length === 0 ? hx("div", { style: { fontSize: 13, color: T.textMuted, padding: "6px 0" } }, "Поки немає публічних кімнат. Створіть першу!") : null,
+      list.map((r) => hx("div", { key: r.code, style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px dashed ${T.border}` } },
         hx("div", { style: { minWidth: 0 } },
           hx("div", { style: { fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.name),
-          hx("div", { style: { fontSize: 11.5, color: T.textMuted } }, `${r.hostName} · ${r.memberCount} онлайн · ${r.hasGame ? "є партія" : "нова партія"}`)
+          hx("div", { style: { fontSize: 11.5, color: T.textMuted } }, `${r.hostName} · ${r.count} онлайн`)
         ),
         hx("button", { onClick: () => doJoin(r.code), style: { ...btn(true), width: "auto", padding: "8px 14px", fontSize: 13, flexShrink: 0 } }, "Увійти")
       ))
