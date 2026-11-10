@@ -18,6 +18,60 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<style>
+html { color-scheme: dark; }
+html[data-theme="light"] { color-scheme: light; }
+body { margin: 0; background: #03100C; overflow-x: hidden; }
+html[data-theme="light"] body { background: #EEF6F1; }
+#fx-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+#root > div { position: relative; z-index: 1; background: transparent !important; }
+
+@keyframes fxIn { from { opacity: 0; transform: translateY(14px) scale(.985); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes fxSheet { from { transform: translateY(44px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fxPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.75); } }
+@keyframes fxScan { 0% { transform: translateY(-100%); } 100% { transform: translateY(350%); } }
+@keyframes fxFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes fxGlow { 0%, 100% { box-shadow: 0 0 0 rgba(245,200,106,0); } 50% { box-shadow: 0 0 26px rgba(245,200,106,.35); } }
+@keyframes fxShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes fxCount { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.fx-in { animation: fxIn .6s cubic-bezier(.2, .8, .2, 1) both; }
+.fx-pulse { animation: fxPulse 1.6s ease-in-out infinite; display: inline-block; }
+.fx-status { transition: color .3s; }
+.fx-scan { position: absolute; left: 0; right: 0; top: 0; height: 38%; background: linear-gradient(transparent, rgba(94, 234, 190, .09), transparent); pointer-events: none; animation: fxScan 4.5s linear infinite; }
+.fx-code { text-shadow: 0 0 18px rgba(245, 200, 106, .35); animation: fxFloat 4s ease-in-out infinite; }
+.fx-glow { animation: fxGlow 3s ease-in-out infinite; }
+.fx-count { animation: fxCount .45s cubic-bezier(.2, .8, .2, 1) both; }
+.fx-title {
+  background: linear-gradient(90deg, #EAFBF4 0%, #5EEABE 30%, #F5C86A 50%, #5EEABE 70%, #EAFBF4 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: fxShimmer 6s linear infinite;
+}
+html[data-theme="light"] .fx-title { background: linear-gradient(90deg, #0F2A22 0%, #0E7C9A 30%, #B07A1E 50%, #0E7C9A 70%, #0F2A22 100%); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Екрани, модалки і картки — плавна поява. */
+#root div[style*="max-width: 480px"] { animation: fxIn .55s cubic-bezier(.2, .8, .2, 1) both; }
+#root div[style*="border-top-left-radius: 22px"] { animation: fxSheet .5s cubic-bezier(.2, .8, .2, 1) both; }
+#root div[style*="position: fixed"][style*="z-index: 50"] { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+
+/* Кнопки і поля — відгук на дію. */
+#root button { transition: transform .18s ease, box-shadow .3s ease, filter .25s ease, background-color .3s ease, color .3s ease, border-color .3s ease, opacity .2s; cursor: pointer; }
+#root button:hover { filter: brightness(1.08); }
+#root button:active { transform: scale(.95); }
+#root input { transition: border-color .25s, box-shadow .3s, background-color .3s; }
+#root input:focus { box-shadow: 0 0 0 3px rgba(94, 234, 190, .22) !important; }
+#root input::placeholder { opacity: .55; }
+
+::selection { background: rgba(245, 200, 106, .35); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(94, 234, 190, .25); border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+</style>
 </head>
 <body>
 <div id="root"><div id="boot">Завантаження…</div></div>
@@ -66,7 +120,7 @@ const RUN_COMBOS = [
   { key: "sotnya", label: "\u0421\u043E\u0442\u043D\u044F", desc: "5 \u043A\u0430\u0440\u0442 \u043F\u043E\u0441\u043F\u0456\u043B\u044C \u043E\u0434\u043D\u0456\u0454\u0457 \u043C\u0430\u0441\u0442\u0456", value: 100 }
 ];
 const MARRIAGE = { key: "marriage", label: "\u041C\u0430\u0440'\u044F\u0436 / \u0411\u0435\u043B\u043B\u0430", desc: "\u041A\u043E\u0437\u0438\u0440\u043D\u0456 \u0434\u0430\u043C\u0430 \u0456 \u043A\u043E\u0440\u043E\u043B\u044C (\u0431\u0435\u043B\u043B\u0430) \u0430\u0431\u043E \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u0438\u0439 \u043C\u0430\u0440'\u044F\u0436", value: 20 };
-const PLAYER_COLORS_DARK = ["#4FB48A", "#D08872", "#5B93C4", "#B183C4"];
+const PLAYER_COLORS_DARK = ["#5EEABE", "#FF9D7A", "#6EB5FF", "#C49BFF"];
 const PLAYER_COLORS_LIGHT = ["#1E6E4F", "#8A3A2F", "#2F5F82", "#6B4478"];
 const DEFAULT_NAMES = ["\u0413\u0440\u0430\u0432\u0435\u0446\u044C 1", "\u0413\u0440\u0430\u0432\u0435\u0446\u044C 2", "\u0413\u0440\u0430\u0432\u0435\u0446\u044C 3", "\u0413\u0440\u0430\u0432\u0435\u0446\u044C 4"];
 const DEBERTS_PRESETS = {
@@ -355,38 +409,38 @@ async function clearGame() {
 }
 const THEMES = {
   dark: {
-    bg: "#0E271D",
-    bgAlt: "#123222",
-    panel: "#163A28",
-    panelAlt: "#1D4A32",
-    border: "#2B5A3F",
-    text: "#F4EEDC",
-    textMuted: "#A9BCAD",
-    gold: "#D8B26A",
-    goldSoft: "rgba(216,178,106,0.16)",
-    danger: "#D9695F",
-    dangerSoft: "rgba(217,105,95,0.15)",
-    warn: "#D9B25F",
-    warnSoft: "rgba(217,178,95,0.15)",
-    shadow: "0 10px 30px rgba(0,0,0,0.35)",
-    overlay: "rgba(6,16,11,0.72)"
+    bg: "#03100C",
+    bgAlt: "#0A2A20",
+    panel: "rgba(10, 36, 28, 0.62)",
+    panelAlt: "rgba(18, 56, 44, 0.72)",
+    border: "rgba(94, 234, 190, 0.18)",
+    text: "#EAFBF4",
+    textMuted: "#8FB9A8",
+    gold: "#F5C86A",
+    goldSoft: "rgba(245, 200, 106, 0.14)",
+    danger: "#FF7A6B",
+    dangerSoft: "rgba(255, 122, 107, 0.14)",
+    warn: "#FFD27A",
+    warnSoft: "rgba(255, 210, 122, 0.12)",
+    shadow: "0 18px 50px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+    overlay: "rgba(2, 8, 6, 0.66)"
   },
   light: {
-    bg: "#F2E9D3",
-    bgAlt: "#ECE0C3",
-    panel: "#FFFCF3",
-    panelAlt: "#F8EFD8",
-    border: "#DDCB9C",
-    text: "#26301D",
-    textMuted: "#736A52",
-    gold: "#A97B2E",
-    goldSoft: "rgba(169,123,46,0.12)",
-    danger: "#A5382D",
-    dangerSoft: "rgba(165,56,45,0.10)",
-    warn: "#96721E",
-    warnSoft: "rgba(150,114,30,0.12)",
-    shadow: "0 10px 26px rgba(90,70,30,0.16)",
-    overlay: "rgba(60,48,24,0.45)"
+    bg: "#EEF6F1",
+    bgAlt: "#DCEEE5",
+    panel: "rgba(255, 255, 255, 0.72)",
+    panelAlt: "rgba(232, 246, 239, 0.92)",
+    border: "rgba(14, 124, 154, 0.22)",
+    text: "#0F2A22",
+    textMuted: "#4D6B60",
+    gold: "#B07A1E",
+    goldSoft: "rgba(176, 122, 30, 0.12)",
+    danger: "#C2412F",
+    dangerSoft: "rgba(194, 65, 47, 0.10)",
+    warn: "#9A6B12",
+    warnSoft: "rgba(154, 107, 18, 0.12)",
+    shadow: "0 14px 40px rgba(20, 60, 50, 0.14)",
+    overlay: "rgba(10, 30, 24, 0.4)"
   }
 };
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
@@ -875,19 +929,24 @@ function TabBtn({ icon, label, active, onClick, T }) {
 function TallyMark({ T }) {
   return /* @__PURE__ */ React.createElement("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none" }, /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "19", x2: "4", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "19", x2: "9", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "14", y1: "19", x2: "14", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "1", y1: "6", x2: "17", y2: "20", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("circle", { cx: "20", cy: "13", r: "3.4", stroke: T.gold, strokeWidth: "1.6" }));
 }
-/* ===================== ОНЛАЙН-КІМНАТИ (Supabase Realtime) ===================== */
+/* ===================== ОНЛАЙН-КІМНАТИ (Supabase: таблиця + Realtime) ===================== */
 const hx = React.createElement;
 const SB_URL = "https://zzsyvlwpasofedpuarnt.supabase.co";
 const SB_KEY = "sb_publishable_jQ0o_7AO5qlE5LyCmoz7-w_4a2SDdA8";
 const NICK_KEY = "debertz:nick";
 const CLIENT_KEY = "debertz:client";
-const LOBBY_TOPIC = "deberts:lobby";
+const SESSION_KEY = "debertz:session";
+const ROOMS_TABLE = "rooms";
+const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 function lsGet(k, d) {
   try { const v = window.localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; }
 }
 function lsSet(k, v) {
   try { window.localStorage.setItem(k, v); } catch (e) {}
+}
+function lsDel(k) {
+  try { window.localStorage.removeItem(k); } catch (e) {}
 }
 function getClientId() {
   let id = lsGet(CLIENT_KEY, "");
@@ -932,68 +991,75 @@ function membersFromPresence(ch) {
   out.sort((a, b) => (a.at || 0) - (b.at || 0));
   return out;
 }
+function timeAgo(iso) {
+  const sec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 60) return "щойно";
+  if (sec < 3600) return Math.round(sec / 60) + " хв тому";
+  return Math.round(sec / 3600) + " год тому";
+}
 /* Керування кімнатою. onRemoteGame(g) — застосувати стан з кімнати; getLocalGame() — поточна гра. */
 function useRoomNet(onRemoteGame, getLocalGame) {
   const [status, setStatus] = useState("offline");
   const [room, setRoom] = useState(null);
   const [notice, setNotice] = useState(null);
   const [lobbyRooms, setLobbyRooms] = useState([]);
+  const [lobbyLoading, setLobbyLoading] = useState(false);
   const chRef = useRef(null);
   const sessionRef = useRef(null);
-  const lobbyRef = useRef(null);
-  const lobbyReadyRef = useRef(false);
-  const lobbyMetaRef = useRef(null);
+  const saveTimerRef = useRef(null);
+  const pendingRef = useRef(null);
   const remoteRef = useRef(onRemoteGame);
   const localRef = useRef(getLocalGame);
   remoteRef.current = onRemoteGame;
   localRef.current = getLocalGame;
 
-  /* Lobby: публічні кімнати = presence у спільному каналі. */
-  const lobbySync = () => {
-    const ch = lobbyRef.current;
-    if (!ch) return;
-    const st = ch.presenceState();
-    const byCode = {};
-    Object.keys(st).forEach((k) => st[k].forEach((m) => { if (m && m.code) byCode[m.code] = m; }));
-    setLobbyRooms(Object.values(byCode));
+  /* ---------- База даних ---------- */
+  const dbSave = async (code, state) => {
+    try {
+      await getSb().from(ROOMS_TABLE).update({ state, updated_at: new Date().toISOString() }).eq("code", code);
+    } catch (e) {}
   };
-  useEffect(() => {
-    const sb = getSb();
-    const ch = sb.channel(LOBBY_TOPIC, { config: { presence: { key: getClientId() } } });
-    lobbyRef.current = ch;
-    ch.on("presence", { event: "sync" }, lobbySync)
-      .subscribe(async (st) => {
-        if (st === "SUBSCRIBED") {
-          lobbyReadyRef.current = true;
-          lobbySync();
-          if (lobbyMetaRef.current) await ch.track(lobbyMetaRef.current);
-        } else {
-          lobbyReadyRef.current = false;
-        }
-      });
-    return () => {
-      lobbyReadyRef.current = false;
-      lobbyRef.current = null;
-      sb.removeChannel(ch);
-    };
-  }, []);
-  const setLobbyMeta = (meta) => {
-    lobbyMetaRef.current = meta;
-    const ch = lobbyRef.current;
-    if (!ch || !lobbyReadyRef.current) return;
-    if (meta) ch.track(meta);
-    else ch.untrack();
+  const flushSave = () => {
+    clearTimeout(saveTimerRef.current);
+    const p = pendingRef.current;
+    pendingRef.current = null;
+    if (p) dbSave(p.code, p.state);
+  };
+  const scheduleSave = (code, state) => {
+    pendingRef.current = { code, state };
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(flushSave, 150);
+  };
+  const refreshLobby = async () => {
+    setLobbyLoading(true);
+    try {
+      const since = new Date(Date.now() - ROOM_TTL_MS).toISOString();
+      const { data, error } = await getSb().from(ROOMS_TABLE)
+        .select("code,name,host_name,updated_at")
+        .eq("is_public", true)
+        .gte("updated_at", since)
+        .order("updated_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      setLobbyRooms((data || []).map((r) => ({ code: r.code, name: r.name, hostName: r.host_name, updatedAt: r.updated_at })));
+    } catch (e) {
+      setLobbyRooms([]);
+      setNotice("Не вдалося отримати список кімнат.");
+    }
+    setLobbyLoading(false);
   };
 
-  const teardown = () => {
+  /* ---------- Realtime ---------- */
+  const teardown = (keepSession) => {
+    flushSave();
     const ch = chRef.current;
     chRef.current = null;
     sessionRef.current = null;
+    if (!keepSession) lsDel(SESSION_KEY);
     if (ch) {
       try { ch.untrack(); } catch (e) {}
       try { getSb().removeChannel(ch); } catch (e) {}
     }
-    setLobbyMeta(null);
     setRoom(null);
     setStatus("offline");
   };
@@ -1002,121 +1068,142 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     const s = sessionRef.current;
     const ch = chRef.current;
     if (!s || !ch) return;
+    scheduleSave(s.code, g);
     if (s.subscribed) ch.send({ type: "broadcast", event: "state", payload: { game: g } });
-    else s.dirty = true;
   };
 
-  const enter = (code, nick, isHost, isPublic, roomName, awaitState) => {
+  /* Підключення до кімнати. mode: "create" | "join" | "restore". */
+  const enter = async ({ code, nick, isHost, mode, roomName, isPublic }) => {
     const cid = getClientId();
     const sb = getSb();
-    const s = { code, cid, subscribed: false, dirty: false, joined: false, helloTimer: null, awaitState };
-    sessionRef.current = s;
     setStatus("connecting");
     setNotice(null);
+
+    // 1) Стан кімнати в базі.
+    let state = null;
+    let info = null;
+    if (mode === "create") {
+      const row = { code, name: roomName, is_public: isPublic, host_name: nick, state: localRef.current(), updated_at: new Date().toISOString() };
+      const { error } = await sb.from(ROOMS_TABLE).insert(row);
+      if (error) { setNotice("Не вдалося створити кімнату. Спробуйте ще раз."); setStatus("offline"); return false; }
+      state = row.state;
+      info = { name: roomName, is_public: isPublic };
+    } else {
+      const { data, error } = await sb.from(ROOMS_TABLE).select("name,is_public,state").eq("code", code).maybeSingle();
+      if (error) { setNotice("Немає зв'язку з сервером. Перевірте інтернет."); setStatus("offline"); return false; }
+      if (!data) {
+        lsDel(SESSION_KEY);
+        setNotice("Кімнату з таким кодом не знайдено.");
+        setStatus("offline");
+        return false;
+      }
+      info = { name: data.name, is_public: data.is_public };
+      state = data.state;
+      if (state) {
+        remoteRef.current(normalizeGame(state));
+      } else {
+        // У кімнаті ще немає партії — стаємо її першим станом.
+        await dbSave(code, localRef.current());
+      }
+    }
+
+    // 2) Канал реального часу: учасники і миттєві оновлення.
+    const s = { code, cid, subscribed: false };
+    sessionRef.current = s;
     const ch = sb.channel("deberts:room:" + code, { config: { presence: { key: cid }, broadcast: { self: false } } });
     chRef.current = ch;
+    lsSet(SESSION_KEY, JSON.stringify({ code, nick, isHost, mode: "restore" }));
 
     const syncRoom = () => {
       if (chRef.current !== ch) return;
       const members = membersFromPresence(ch);
-      const info = members.find((m) => m.roomName) || {};
       const hostM = members.find((m) => m.host) || members[0];
       setRoom({
         code,
-        name: info.roomName || "Партія",
-        isPublic: !!info.isPublic,
+        name: info.name,
+        isPublic: !!info.is_public,
         you: cid,
         hostId: hostM ? hostM.id : null,
         members: members.map((m) => ({ id: m.id, name: m.name, host: m.id === (hostM && hostM.id) }))
       });
-      if (info.isPublic) {
-        setLobbyMeta({ code, name: info.roomName || "Партія", hostName: hostM ? hostM.name : "", count: members.length, hasGame: true, isPublic: true });
-      }
     };
     ch.on("presence", { event: "sync" }, syncRoom);
     ch.on("broadcast", { event: "state" }, ({ payload }) => {
       if (chRef.current !== ch || !payload || !payload.game) return;
-      s.awaitState = false;
-      if (s.helloTimer) { clearTimeout(s.helloTimer); s.helloTimer = null; }
       remoteRef.current(normalizeGame(payload.game));
-    });
-    ch.on("broadcast", { event: "hello" }, () => {
-      if (chRef.current !== ch) return;
-      ch.send({ type: "broadcast", event: "state", payload: { game: localRef.current() } });
     });
     ch.on("broadcast", { event: "closed" }, () => {
       if (chRef.current !== ch) return;
-      teardown();
+      teardown(false);
       setNotice("Хост закрив кімнату.");
     });
-
     ch.subscribe(async (st) => {
       if (chRef.current !== ch) return;
       if (st === "SUBSCRIBED") {
         s.subscribed = true;
-        await ch.track({ id: cid, name: nick, host: isHost, at: Date.now(), roomName, isPublic });
+        await ch.track({ id: cid, name: nick, host: isHost, at: Date.now() });
         setStatus("online");
-        if (s.joined) {
-          // Перепідключення: повертаємо свої незбережені зміни.
-          if (s.dirty) {
-            s.dirty = false;
-            ch.send({ type: "broadcast", event: "state", payload: { game: localRef.current() } });
-          }
-          return;
-        }
-        s.joined = true;
-        if (isHost) return;
-        // Гість: чекаємо, поки хтось у кімнаті не відповість.
-        setTimeout(() => {
-          if (chRef.current !== ch) return;
-          const others = membersFromPresence(ch).filter((m) => m.id !== cid).length;
-          if (others === 0) {
-            teardown();
-            setNotice("Кімнату з таким кодом не знайдено.");
-            return;
-          }
-          ch.send({ type: "broadcast", event: "hello", payload: {} });
-        }, 700);
       } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
         s.subscribed = false;
         if (chRef.current === ch) setStatus("reconnecting");
       }
     });
+    return true;
   };
 
-  const createRoom = ({ nick, roomName, isPublic }) => {
-    teardown();
-    setNotice(null);
-    enter(makeRoomCode(), nick, true, isPublic, roomName, false);
+  const createRoom = async ({ nick, roomName, isPublic }) => {
+    teardown(false);
+    const code = makeRoomCode();
+    const ok = await enter({ code, nick, isHost: true, mode: "create", roomName, isPublic });
+    if (ok) lsSet(SESSION_KEY, JSON.stringify({ code, nick, isHost: true, mode: "restore" }));
   };
-  const joinRoom = ({ code, nick }) => {
-    teardown();
-    setNotice(null);
-    enter(code, nick, false, false, "", true);
+  const joinRoom = async ({ code, nick }) => {
+    teardown(false);
+    await enter({ code, nick, isHost: false, mode: "join" });
+  };
+  /* Автовідновлення після перезавантаження сторінки. */
+  const restore = async () => {
+    const raw = lsGet(SESSION_KEY, "");
+    if (!raw || chRef.current) return;
+    let sess = null;
+    try { sess = JSON.parse(raw); } catch (e) {}
+    if (!sess || !sess.code) { lsDel(SESSION_KEY); return; }
+    await enter({ code: sess.code, nick: sess.nick || "Гравець", isHost: !!sess.isHost, mode: "restore" });
   };
   const leave = () => {
-    teardown();
+    teardown(false);
     setNotice(null);
   };
   const closeRoom = async () => {
+    const s = sessionRef.current;
     const ch = chRef.current;
+    if (!s) return;
     if (ch) {
       try { await ch.send({ type: "broadcast", event: "closed", payload: {} }); } catch (e) {}
     }
-    teardown();
+    try { await getSb().from(ROOMS_TABLE).delete().eq("code", s.code); } catch (e) {}
+    teardown(false);
     setNotice("Кімнату закрито.");
   };
-  return { status, room, notice, setNotice, lobbyRooms, createRoom, joinRoom, leave, closeRoom, sendState };
+  useEffect(() => {
+    const onHide = () => flushSave();
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
+  return { status, room, notice, setNotice, lobbyRooms, lobbyLoading, refreshLobby, createRoom, joinRoom, restore, leave, closeRoom, sendState };
 }
 function ConnStatus({ T, status }) {
   const map = {
-    online: ["#4FB48A", "Зʼєднано"],
+    online: ["#5EEABE", "Зʼєднано"],
     connecting: [T.warn, "Підключення…"],
     reconnecting: [T.warn, "Перепідключення…"],
     offline: [T.textMuted, "Не в кімнаті"]
   };
   const [color, label] = map[status] || map.offline;
-  return hx("div", { style: { fontSize: 12, color, marginBottom: 12, fontWeight: 600 } }, "● ", label);
+  return hx("div", { className: "fx-status", style: { fontSize: 12, color, marginBottom: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 } },
+    hx("span", { className: status === "online" ? "fx-pulse" : "", style: { width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" } }),
+    label
+  );
 }
 function OnlineTab({ T, net, getLocalGame }) {
   const [nick, setNick] = useState(() => lsGet(NICK_KEY, ""));
@@ -1139,13 +1226,19 @@ function OnlineTab({ T, net, getLocalGame }) {
     remember();
     net.joinRoom({ code: cc, nick: nickFinal });
   };
+  useEffect(() => {
+    if (net.room) return;
+    net.refreshLobby();
+    const t = setInterval(() => net.refreshLobby(), 15000);
+    return () => clearInterval(t);
+  }, [!!net.room]);
 
-  const box = { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 18, padding: 16, marginBottom: 14, boxShadow: T.shadow };
-  const input = { width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontSize: 14, fontFamily: "'Inter',sans-serif", outline: "none" };
-  const btn = (primary, extra) => ({ width: "100%", padding: "13px 0", borderRadius: 14, border: primary ? "none" : `1px solid ${T.border}`, background: primary ? T.gold : "transparent", color: primary ? T.bg : T.text, fontWeight: 700, fontSize: 14, ...extra });
-  const label = (t) => hx("div", { style: { fontSize: 12, color: T.textMuted, margin: "12px 0 6px", fontWeight: 600 } }, t);
+  const box = { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 20, padding: 18, marginBottom: 14, boxShadow: T.shadow, backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" };
+  const input = { width: "100%", boxSizing: "border-box", padding: "13px 15px", borderRadius: 13, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontSize: 14, fontFamily: "'Inter',sans-serif", outline: "none" };
+  const btn = (primary, extra) => ({ width: "100%", padding: "14px 0", borderRadius: 15, border: primary ? "none" : `1px solid ${T.border}`, background: primary ? `linear-gradient(135deg, ${T.gold}, #FFE29A)` : "transparent", color: primary ? T.bg : T.text, fontWeight: 700, fontSize: 14, boxShadow: primary ? "0 8px 24px rgba(245,200,106,.25)" : "none", ...extra });
+  const label = (t) => hx("div", { style: { fontSize: 12, color: T.textMuted, margin: "12px 0 6px", fontWeight: 600, letterSpacing: 0.3 } }, t);
   const wrap = { padding: "10px 16px 20px", maxWidth: 480, margin: "0 auto" };
-  const notice = net.notice ? hx("div", { style: { background: T.warnSoft, border: `1px solid ${T.warn}`, borderRadius: 12, padding: "10px 12px", marginBottom: 12, fontSize: 12.5, lineHeight: 1.5 } }, net.notice) : null;
+  const notice = net.notice ? hx("div", { className: "fx-in", style: { background: T.warnSoft, border: `1px solid ${T.warn}`, borderRadius: 14, padding: "11px 13px", marginBottom: 12, fontSize: 12.5, lineHeight: 1.5 } }, net.notice) : null;
 
   if (net.room) {
     const r = net.room;
@@ -1158,29 +1251,29 @@ function OnlineTab({ T, net, getLocalGame }) {
     return hx("div", { style: wrap },
       hx(ConnStatus, { T, status: net.status }),
       notice,
-      hx("div", { style: box },
-        hx("div", { style: { fontSize: 12, color: T.textMuted } }, r.isPublic ? "Публічна кімната" : "Приватна кімната"),
-        hx("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 20, marginTop: 2 } }, r.name),
+      hx("div", { className: "fx-in", style: { ...box, position: "relative", overflow: "hidden" } },
+        hx("div", { className: "fx-scan" }),
+        hx("div", { style: { fontSize: 12, color: T.textMuted, letterSpacing: 0.5, textTransform: "uppercase" } }, r.isPublic ? "Публічна кімната" : "Приватна кімната"),
+        hx("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 22, marginTop: 3 } }, r.name),
         hx("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 14, flexWrap: "wrap" } },
-          hx("div", { style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 30, fontWeight: 600, letterSpacing: 6, color: T.gold } }, r.code),
-          hx("button", { onClick: copy, style: { ...btn(false), width: "auto", padding: "9px 14px", fontSize: 12.5 } }, "Копіювати посилання")),
-        hx("div", { style: { fontSize: 12, color: T.textMuted, marginTop: 10, lineHeight: 1.5 } }, "Надішліть код або посилання другому гравцеві. Він побачить той самий рахунок і історію та зможе додавати розділи. Зміни синхронізуються в реальному часі.")),
+          hx("div", { className: "fx-code", style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 32, fontWeight: 600, letterSpacing: 7, color: T.gold } }, r.code),
+          hx("button", { onClick: copy, style: { ...btn(false), width: "auto", padding: "9px 15px", fontSize: 12.5 } }, "Копіювати посилання")),
+        hx("div", { style: { fontSize: 12, color: T.textMuted, marginTop: 10, lineHeight: 1.6 } }, "Надішліть код або посилання другому гравцеві. Він побачить той самий рахунок і історію та зможе додавати розділи. Стан зберігається, тож перезавантаження нічого не ламає.")),
       hx("div", { style: box },
         hx("div", { style: { fontWeight: 700, marginBottom: 6 } }, `Учасники (${r.members.length})`),
-        r.members.map((m) => hx("div", { key: m.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: `1px dashed ${T.border}`, fontSize: 14 } },
-          hx("span", null, "● ", m.name, m.id === r.you ? " (ви)" : ""),
-          m.host ? hx("span", { style: { color: T.gold, fontSize: 11.5, fontWeight: 700 } }, "ХОСТ") : null
+        r.members.map((m, i) => hx("div", { key: m.id, className: "fx-in", style: { animationDelay: `${i * 60}ms`, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: `1px dashed ${T.border}`, fontSize: 14 } },
+          hx("span", null, hx("span", { className: "fx-pulse", style: { color: "#5EEABE", marginRight: 6 } }, "●"), m.name, m.id === r.you ? " (ви)" : ""),
+          m.host ? hx("span", { style: { color: T.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1, padding: "3px 8px", borderRadius: 999, border: `1px solid ${T.gold}` } }, "ХОСТ") : null
         ))),
       hx("button", { onClick: net.leave, style: btn(false) }, "Вийти з кімнати"),
       isHost ? hx("button", { onClick: () => { if (window.confirm("Закрити кімнату для всіх учасників?")) net.closeRoom(); }, style: { ...btn(false), marginTop: 10, color: T.danger, borderColor: T.danger } }, "Закрити кімнату") : null
     );
   }
 
-  const seen = {};
-  const list = (net.lobbyRooms || []).filter((r) => { if (seen[r.code]) return false; seen[r.code] = true; return true; });
+  const list = net.lobbyRooms || [];
   return hx("div", { style: wrap },
-    hx("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 22 } }, "Онлайн-кімната"),
-    hx("div", { style: { fontSize: 13, color: T.textMuted, margin: "4px 0 14px", lineHeight: 1.5 } }, "Один створює кімнату, другий заходить за кодом. Обидва бачать один рахунок у реальному часі."),
+    hx("div", { className: "fx-in", style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 24 } }, "Онлайн-кімната"),
+    hx("div", { className: "fx-in", style: { fontSize: 13, color: T.textMuted, margin: "4px 0 14px", lineHeight: 1.6 } }, "Один створює кімнату, другий заходить за кодом. Обидва бачать один рахунок у реальному часі."),
     hx(ConnStatus, { T, status: net.status }),
     notice,
     hx("div", { style: box },
@@ -1202,21 +1295,145 @@ function OnlineTab({ T, net, getLocalGame }) {
       hx("div", { style: { fontWeight: 700, marginBottom: 10 } }, "Приєднатися за кодом"),
       hx("div", { style: { display: "flex", gap: 8 } },
         hx("input", { value: code, onChange: (e) => setCode(e.target.value.toUpperCase()), placeholder: "КОД", maxLength: 8, style: { ...input, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 4, textAlign: "center", fontSize: 18, flex: 1 } }),
-        hx("button", { onClick: () => doJoin(), style: { ...btn(true), width: "auto", padding: "0 20px" } }, "Увійти")
+        hx("button", { onClick: () => doJoin(), style: { ...btn(true), width: "auto", padding: "0 22px" } }, "Увійти")
       )
     ),
     hx("div", { style: box },
-      hx("div", { style: { fontWeight: 700, marginBottom: 6 } }, "Публічні кімнати"),
+      hx("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
+        hx("div", { style: { fontWeight: 700 } }, "Публічні кімнати"),
+        hx("button", { onClick: () => net.refreshLobby(), style: { background: "transparent", border: `1px solid ${T.border}`, color: T.text, borderRadius: 10, padding: "5px 10px", fontSize: 11.5 } }, net.lobbyLoading ? "…" : "Оновити")
+      ),
       list.length === 0 ? hx("div", { style: { fontSize: 13, color: T.textMuted, padding: "6px 0" } }, "Поки немає публічних кімнат. Створіть першу!") : null,
-      list.map((r) => hx("div", { key: r.code, style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: `1px dashed ${T.border}` } },
+      list.map((r, i) => hx("div", { key: r.code, className: "fx-in", style: { animationDelay: `${i * 50}ms`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "11px 0", borderTop: `1px dashed ${T.border}` } },
         hx("div", { style: { minWidth: 0 } },
           hx("div", { style: { fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.name),
-          hx("div", { style: { fontSize: 11.5, color: T.textMuted } }, `${r.hostName} · ${r.count} онлайн`)
+          hx("div", { style: { fontSize: 11.5, color: T.textMuted } }, `${r.hostName} · ${timeAgo(r.updatedAt)} · код ${r.code}`)
         ),
-        hx("button", { onClick: () => doJoin(r.code), style: { ...btn(true), width: "auto", padding: "8px 14px", fontSize: 13, flexShrink: 0 } }, "Увійти")
+        hx("button", { onClick: () => doJoin(r.code), style: { ...btn(true), width: "auto", padding: "8px 15px", fontSize: 13, flexShrink: 0 } }, "Увійти")
       ))
     )
   );
+}
+
+/* ===================== АНІМОВАНИЙ ФОН (canvas): аврора, частинки, конфетті ===================== */
+/* Події: window "fx:burst" — конфетті; тема береться з document.documentElement.dataset.theme. */
+function FxBackground() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    const reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const glyphs = ["♠", "♥", "♦", "♣"];
+    let w = 0, h = 0, dpr = 1, raf = 0, parts = [], bits = [];
+
+    const palette = () => (document.documentElement.dataset.theme === "light"
+      ? { a: "14,124,154", b: "176,122,30", ink: "14,124,154" }
+      : { a: "94,234,190", b: "245,200,106", ink: "94,234,190" });
+
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = window.innerWidth;
+      h = window.innerHeight;
+      cv.width = w * dpr;
+      cv.height = h * dpr;
+      cv.style.width = w + "px";
+      cv.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = reduce ? 0 : Math.min(54, Math.round((w * h) / 24000) + 14);
+      parts = Array.from({ length: n }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        s: 10 + Math.random() * 16,
+        v: 0.1 + Math.random() * 0.32,
+        dx: (Math.random() - 0.5) * 0.2,
+        a: 0.07 + Math.random() * 0.2,
+        g: glyphs[(Math.random() * 4) | 0],
+        ph: Math.random() * 6.28
+      }));
+    };
+
+    const burst = () => {
+      const p = palette();
+      const cols = [p.a, p.b, "255,255,255"];
+      for (let i = 0; i < 150; i++) {
+        bits.push({
+          x: w / 2 + (Math.random() - 0.5) * w * 0.3,
+          y: h * 0.38,
+          vx: (Math.random() - 0.5) * 13,
+          vy: -(Math.random() * 13 + 5),
+          rot: Math.random() * 6.28,
+          vr: (Math.random() - 0.5) * 0.3,
+          sz: 6 + Math.random() * 7,
+          col: cols[(Math.random() * cols.length) | 0],
+          life: 150 + Math.random() * 90
+        });
+      }
+    };
+
+    const draw = (t) => {
+      const p = palette();
+      ctx.clearRect(0, 0, w, h);
+      // Аврора: три м'які світлові плями, що повільно дрейфують.
+      for (let i = 0; i < 3; i++) {
+        const cx = w * (0.5 + 0.38 * Math.sin(t * 0.00012 * (i + 1) + i * 1.7));
+        const cy = h * (0.22 + 0.18 * Math.cos(t * 0.0001 * (i + 1) + i * 2.3));
+        const r = Math.max(w, h) * 0.6;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        const c = i === 1 ? p.b : p.a;
+        g.addColorStop(0, `rgba(${c},${document.documentElement.dataset.theme === "light" ? 0.14 : 0.13})`);
+        g.addColorStop(1, `rgba(${c},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+      }
+      // Плаваючі масті.
+      ctx.textAlign = "center";
+      parts.forEach((q) => {
+        q.y -= q.v;
+        q.x += q.dx + Math.sin(t * 0.001 + q.ph) * 0.15;
+        if (q.y < -30) { q.y = h + 30; q.x = Math.random() * w; }
+        ctx.font = `${q.s}px serif`;
+        ctx.fillStyle = `rgba(${p.ink},${q.a * (0.7 + 0.3 * Math.sin(t * 0.002 + q.ph))})`;
+        ctx.fillText(q.g, q.x, q.y);
+      });
+      // Конфетті.
+      bits = bits.filter((b) => b.life > 0);
+      bits.forEach((b) => {
+        b.vy += 0.22;
+        b.vx *= 0.985;
+        b.x += b.vx;
+        b.y += b.vy;
+        b.rot += b.vr;
+        b.life -= 1;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, b.life / 90));
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.rot);
+        ctx.fillStyle = `rgb(${b.col})`;
+        ctx.fillRect(-b.sz / 2, -b.sz * 0.22, b.sz, b.sz * 0.44);
+        ctx.restore();
+      });
+    };
+
+    let last = 0;
+    const loop = (t) => {
+      // ~60 кадрів/с; на слабких пристроях м'яко знижуємо до ~30.
+      if (t - last > 14) { draw(t); last = t; }
+      raf = requestAnimationFrame(loop);
+    };
+    resize();
+    const onBurst = () => burst();
+    window.addEventListener("resize", resize);
+    window.addEventListener("fx:burst", onBurst);
+    if (reduce) draw(0);
+    else raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("fx:burst", onBurst);
+    };
+  }, []);
+  return hx("canvas", { ref, id: "fx-canvas", "aria-hidden": "true" });
 }
 
 /* ===================== ПРАВИЛА (картинки і схеми) ===================== */
@@ -1377,6 +1594,16 @@ function DebertsCounter() {
     () => evaluateEnd(game.rounds, players, game.settings),
     [game.rounds, players, game.settings]
   );
+  useEffect(() => {
+    document.documentElement.dataset.theme = game.theme === "light" ? "light" : "dark";
+  }, [game.theme]);
+  useEffect(() => {
+    // Автовідновлення онлайн-кімнати після перезавантаження (після завантаження збережених даних).
+    if (loaded) net.restore();
+  }, [loaded]);
+  useEffect(() => {
+    if (evalResult.finished) window.dispatchEvent(new Event("fx:burst"));
+  }, [evalResult.finished]);
   const updateSettings = (patch) => setGame((g) => ({ ...g, settings: { ...g.settings, ...patch } }));
   const setName = (key, val) => setGame((g) => ({ ...g, players: { ...g.players, [key]: val } }));
   const editingRound = editingRoundId ? { ...game.rounds.find((r) => r.id === editingRoundId), number: game.rounds.findIndex((r) => r.id === editingRoundId) + 1 } : null;
@@ -1435,7 +1662,7 @@ function DebertsCounter() {
       setGame((g) => ({ ...g, players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, setupDone: true }));
     } }));
   }
-  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(120% 100% at 50% -10%, ${T.bgAlt}, ${T.bg})`, color: T.text, fontFamily: "'Inter',sans-serif", paddingBottom: 84 } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT, `::selection{background:${T.gold}55} input:focus,textarea:focus{border-color:${T.gold} !important} @media (orientation:landscape){body{}}`), /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 16px 6px", maxWidth: 480, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TallyMark, { T }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 19 } }, "\u0414\u0435\u0431\u0435\u0440\u0446"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.textMuted, marginTop: 2 } }, "\u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456 \u043F\u0440\u0430\u0432\u0438\u043B\u0430")), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(120% 100% at 50% -10%, ${T.bgAlt}, ${T.bg})`, color: T.text, fontFamily: "'Inter',sans-serif", paddingBottom: 84 } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT, `::selection{background:${T.gold}55} input:focus,textarea:focus{border-color:${T.gold} !important} @media (orientation:landscape){body{}}`), /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 16px 6px", maxWidth: 480, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TallyMark, { T }), /* @__PURE__ */ React.createElement("div", { className: "fx-title", style: { fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: 20 } }, "\u0414\u0435\u0431\u0435\u0440\u0446"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.textMuted, marginTop: 2 } }, "\u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456 \u043F\u0440\u0430\u0432\u0438\u043B\u0430")), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: () => setGame((g) => ({ ...g, theme: g.theme === "dark" ? "light" : "dark" })),
@@ -1449,7 +1676,7 @@ function DebertsCounter() {
 }
 try {
   const __root = ReactDOM.createRoot(document.getElementById("root"));
-  __root.render(/* @__PURE__ */ React.createElement(DebertsCounter, null));
+  __root.render(React.createElement(React.Fragment, null, React.createElement(FxBackground, null), React.createElement(DebertsCounter, null)));
 } catch (e) {
   document.getElementById("root").innerHTML = '<div style="padding:24px;color:#F4EEDC;font-family:sans-serif;white-space:pre-wrap;">\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u043F\u0443\u0441\u043A\u0443:\n' + (e && e.message ? e.message : String(e)) + "</div>";
 }
