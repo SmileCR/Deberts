@@ -93,6 +93,19 @@ html[data-theme="light"] #root button.fx-gear { background: rgba(255, 255, 255, 
 #root button[style*="bottom: 98px"] { width: 56px !important; height: 56px !important; right: 20px !important; bottom: 88px !important; box-shadow: 0 12px 28px rgba(245, 200, 106, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.45) !important; }
 div[style*="bottom: 98px"]:not(button) { right: 20px !important; bottom: 88px !important; }
 
+/* ---- Редизайн «свіжий»: м'які великі картки, округлі цифри, світлий блік на поверхнях (apple-design) ---- */
+#root div[style*="border-radius: 16px"], #root div[style*="border-radius: 18px"], #root div[style*="border-radius: 20px"] { border-radius: 24px !important; }
+#root div[style*="border-radius: 24px"] {
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 55%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 40px rgba(0, 0, 0, 0.26) !important;
+}
+html[data-theme="light"] #root div[style*="border-radius: 24px"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 14px 34px rgba(20, 60, 50, 0.12) !important; }
+#root div[style*="IBM Plex Mono"], #root span[style*="IBM Plex Mono"], #root div[style*="IBM Plex Mono"] * { font-family: ui-rounded, "SF Pro Rounded", "IBM Plex Mono", monospace !important; font-variant-numeric: tabular-nums; }
+#root div[style*="font-size: 56px"], #root div[style*="font-size: 52px"], #root div[style*="font-size: 48px"] { letter-spacing: -0.03em; }
+#root button[style*="border-radius: 15px"], #root button[style*="border-radius: 14px"] { border-radius: 16px !important; }
+#root button[style*="linear-gradient"] { letter-spacing: 0.1px; }
+#root .fx-title { font-weight: 800; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -1788,6 +1801,15 @@ function DebertsCounter() {
     const beat = setInterval(() => net.setLock(true), 25000);
     return () => clearInterval(beat);
   }, [showAdd, editingRoundId]);
+  /* Після виходу з кімнати повертаємо особисті налаштування цього пристрою. */
+  const wasInRoom = useRef(false);
+  useEffect(() => {
+    const inRoom = !!net.room;
+    if (wasInRoom.current && !inRoom) {
+      setGame((g) => ({ ...g, settings: { ...defaultSettings(), ...readPrefsSettings() } }));
+    }
+    wasInRoom.current = inRoom;
+  }, [!!net.room]);
   const updateSettings = (patch) => setGame((g) => {
     const settings = { ...g.settings, ...patch };
     savePrefsSettings(settings);
