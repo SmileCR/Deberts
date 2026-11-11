@@ -111,6 +111,37 @@ html[data-theme="light"] #root div[style*="border-radius: 24px"] { backdrop-filt
 html[data-theme="light"] #root div[style*="position: fixed"][style*="bottom: calc(10px"] { backdrop-filter: blur(28px) saturate(180%) !important; -webkit-backdrop-filter: blur(28px) saturate(180%) !important; background: rgba(255, 255, 255, 0.55) !important; box-shadow: 0 18px 40px rgba(30, 80, 70, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important; }
 html[data-theme="light"] #root .fx-title { background: linear-gradient(90deg, #0B2620 0%, #0E7C9A 35%, #B27A22 55%, #0E7C9A 75%, #0B2620 100%); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; }
 
+/* ---- Брендові кнопки «Деберц»: золота фольга, скло, глибина; зернистий фон ---- */
+#root button { letter-spacing: 0.01em; }
+/* Основна дія: золота фольга з верхнім блі­ком і внутрішньою тінню. */
+#root button[style*="linear-gradient"]:not([style*="50%"]) {
+  background: linear-gradient(180deg, #FFEFB8 0%, #EDBB62 48%, #C48A2C 100%) !important;
+  color: #1A1206 !important;
+  border: 1px solid rgba(255, 246, 214, 0.7) !important;
+  border-radius: 18px !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), inset 0 -2px 0 rgba(110, 62, 8, 0.30), 0 12px 28px rgba(196, 138, 44, 0.34), 0 2px 4px rgba(0, 0, 0, 0.14) !important;
+}
+#root button[style*="linear-gradient"]:not([style*="50%"]):active { box-shadow: inset 0 2px 4px rgba(110, 62, 8, 0.35), 0 4px 10px rgba(196, 138, 44, 0.25) !important; }
+/* Друга дія: скло з тонкою рамкою. */
+#root button[style*="background: transparent"] {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03)) !important;
+  border-radius: 18px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 6px 16px rgba(0, 0, 0, 0.12);
+  font-weight: 600 !important;
+}
+html[data-theme="light"] #root button[style*="background: transparent"] {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), 0 6px 16px rgba(30, 80, 70, 0.10);
+}
+#root button:not([style*="linear-gradient"]):active { transform: scale(0.97) !important; }
+#root button[style*="border-radius: 14px"], #root button[style*="border-radius: 15px"], #root button[style*="border-radius: 12px"] { border-radius: 18px !important; }
+/* Зерно: тонка текстура дорогого матеріалу. */
+body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.05; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+/* Заголовки: виразніша ієрархія. */
+#root div[style*="font-size: 22px"][style*="Fraunces"], #root div[style*="font-size: 24px"][style*="Fraunces"] { letter-spacing: -0.02em; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
