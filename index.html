@@ -53,6 +53,7 @@ html[data-theme="light"] .fx-title { background: linear-gradient(90deg, #0F2A22 
 /* Екрани, модалки і картки — плавна поява. */
 #root div[style*="max-width: 480px"] { animation: fxIn .55s cubic-bezier(.2, .8, .2, 1) both; }
 #root div[style*="border-top-left-radius: 22px"] { animation: fxSheet .5s cubic-bezier(.2, .8, .2, 1) both; }
+#root div[style*="border-top-left-radius: 22px"] { max-height: calc(100dvh - env(safe-area-inset-top) - 14px) !important; padding-top: calc(16px + env(safe-area-inset-top)) !important; }
 #root div[style*="position: fixed"][style*="z-index: 50"] { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
 /* Кнопки і поля — відгук на дію. */
