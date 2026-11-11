@@ -142,6 +142,12 @@ body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-in
 /* Заголовки: виразніша ієрархія. */
 #root div[style*="font-size: 22px"][style*="Fraunces"], #root div[style*="font-size: 24px"][style*="Fraunces"] { letter-spacing: -0.02em; }
 
+/* ---- Правила: карта з підписю в колонці, фіксовані пропорції карти ---- */
+.dzr-cards5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; justify-items: center; margin: 12px 0 4px; }
+.dzr-cards5 > div { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+.dzr-cards5 .dzr-tag { min-width: 36px; text-align: center; }
+.dzr-card { aspect-ratio: 64 / 90; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -1287,7 +1293,8 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     ch.on("broadcast", { event: "closed" }, () => {
       if (chRef.current !== ch) return;
       teardown(false);
-      setNotice("Хост закрив кімнату.");
+      remoteRef.current(normalizeGame(defaultGame()));
+      setNotice("Хост закрив кімнату. Партію завершено.");
     });
     ch.subscribe(async (st) => {
       if (chRef.current !== ch) return;
@@ -1364,7 +1371,8 @@ function useRoomNet(onRemoteGame, getLocalGame) {
       try { await ch.send({ type: "broadcast", event: "closed", payload: {} }); } catch (e) {}
     }
     teardown(false);
-    setNotice("Кімнату закрито.");
+    remoteRef.current(normalizeGame(defaultGame()));
+    setNotice("Кімнату закрито. Партію завершено.");
   };
   useEffect(() => {
     const onHide = () => flushSave();
@@ -1637,7 +1645,7 @@ function dzCard(rank, suit, hl) {
   const red = suit === "♥" || suit === "♦";
   const ink = red ? "#B3261E" : "#1B2A22";
   const stroke = hl ? "#D8B26A" : "#8FA596";
-  return `<svg class="dzr-card${hl ? " hl" : ""}" viewBox="0 0 64 90" role="img" aria-label="${rank}${suit}"><rect x="2" y="2" width="60" height="86" rx="9" fill="#FFFCF3" stroke="${stroke}" stroke-width="${hl ? 2.5 : 1.5}"/><text x="9" y="21" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="15" fill="${ink}">${rank}</text><text x="9" y="33" font-size="12" fill="${ink}">${suit}</text><text x="32" y="59" text-anchor="middle" font-size="28" fill="${ink}">${suit}</text><text x="55" y="69" text-anchor="end" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="15" fill="${ink}">${rank}</text><text x="55" y="81" text-anchor="end" font-size="12" fill="${ink}">${suit}</text></svg>`;
+  return `<svg class="dzr-card${hl ? " hl" : ""}" viewBox="0 0 64 90" role="img" aria-label="${rank}${suit}"><rect x="2" y="2" width="60" height="86" rx="9" fill="#FFFCF3" stroke="${stroke}" stroke-width="${hl ? 2.5 : 1.5}"/><text x="9" y="20" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="14" fill="${ink}">${rank}</text><text x="9" y="31" font-size="11" fill="${ink}">${suit}</text><text x="32" y="56" text-anchor="middle" font-size="28" fill="${ink}">${suit}</text><text x="55" y="70" text-anchor="end" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="14" fill="${ink}">${rank}</text><text x="55" y="81" text-anchor="end" font-size="11" fill="${ink}">${suit}</text></svg>`;
 }
 function rulesCss(T, neon, ng) {
   return `
@@ -1716,10 +1724,10 @@ function rulesHtml(s) {
     p(`Гра йде до <b>${target} очок</b>. Після кожної роздачі очки додаються до рахунку. Переможець — той, хто першим перетнув ціль і має більше очок за суперників. Однакова сума — гра триває.`) +
     `<div class="dzr-bar"><i style="width:100%"></i><span style="left:0">0</span><span style="left:50%">${Math.round(target / 2)}</span><span style="right:0">${target}</span></div>`);
 
+  const col = (card, pts) => `<div>${card}<span class="dzr-tag">${pts}</span></div>`;
   const s2 = sec("02", "Очки карт",
-    row(dzCard("A", "♠") + dzCard("10", "♥") + dzCard("K", "♦") + dzCard("Q", "♣") + dzCard("J", "♠")) +
-    `<div class="dzr-row dzr-tags">${tag("11")}${tag("10")}${tag("4")}${tag("3")}${tag("2")}</div>` +
-    p(`Інші карти (6–9) — <b>0 очок</b>.` + (total ? ` Сума очок взяток за роздачу — <b>${total}</b> (152 очки карт + 10 за останню взятку).` : " Перевірку суми очок взяток вимкнено.")));
+    `<div class="dzr-cards5">${col(dzCard("A", "♠"), "11")}${col(dzCard("10", "♥"), "10")}${col(dzCard("K", "♦"), "4")}${col(dzCard("Q", "♣"), "3")}${col(dzCard("J", "♠"), "2")}</div>` +
+    p(`Інші карти (6–9) — <b>0 очок</b>.` + (total ? ` Сума очок взяток за роздачу — <b>${total}</b> (152 очки карт + 10 за останню взятку).` : " Перевірку суми очок взяток вимкнено."))) ;
 
   const s3 = sec("03", "Комбінації",
     p("Рахується лише <b>найстаріша</b> з ряду терц / полтинник / сотня. Марʼяж можна поєднувати з нею.") +
