@@ -1203,7 +1203,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
       clearTimeout(lockTimerRef.current);
       if (payload.on) {
         setLockState({ cid: payload.cid, name: payload.name });
-        lockTimerRef.current = setTimeout(() => setLockState(null), 120000);
+        lockTimerRef.current = setTimeout(() => setLockState(null), 90000);
       } else {
         setLockState((l) => (l && l.cid === payload.cid ? null : l));
       }
@@ -1753,7 +1753,15 @@ function DebertsCounter() {
     if (evalResult.finished) window.dispatchEvent(new Event("fx:burst"));
   }, [evalResult.finished]);
   useEffect(() => { window.scrollTo(0, 0); }, [tab]);
-  useEffect(() => { if (net.room) net.setLock(showAdd || !!editingRoundId); }, [showAdd, editingRoundId]);
+  useEffect(() => {
+    if (!net.room) return;
+    const open = showAdd || !!editingRoundId;
+    net.setLock(open);
+    if (!open) return;
+    // Поки розділ записується, підтверджуємо блокування — інакше воно зніметься у інших.
+    const beat = setInterval(() => net.setLock(true), 25000);
+    return () => clearInterval(beat);
+  }, [showAdd, editingRoundId]);
   const updateSettings = (patch) => setGame((g) => {
     const settings = { ...g.settings, ...patch };
     savePrefsSettings(settings);
