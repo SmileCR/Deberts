@@ -1953,7 +1953,7 @@ function OnlineTab({ T, net, getLocalGame, onOpenGame }) {
 /* ===================== ОНОВЛЕННЯ ЗАСТОСУНКУ ===================== */
 /* Версію мітимо тут і піднімаємо при кожному релізі. Встановлений на головному екрані застосунок
    інакше тримає стару сторінку, тому перевіряємо свіжий index.html із сервера. */
-const APP_VERSION = "2026.11.11-12";
+const APP_VERSION = "2026.11.11-13";
 async function fetchLatestVersion() {
   const r = await fetch(location.pathname + "?vcheck=" + Date.now(), { cache: "no-store" });
   if (!r.ok) throw new Error("http " + r.status);
@@ -2182,7 +2182,7 @@ function FabAdd({ T, lock, myId, onOpen }) {
       hx("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, `${lock.name} записує…`)
     );
   }
-  return hx("button", { onClick: onOpen, className: "fx-glow", style: { position: "fixed", right: 18, bottom: 98, width: 62, height: 62, borderRadius: "50%", background: `linear-gradient(135deg, ${T.gold}, #FFE29A)`, color: T.bg, border: "none", boxShadow: "0 10px 30px rgba(245,200,106,.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, hx(Plus, { size: 26 }));
+  return hx("button", { onClick: onOpen, className: "fx-glow", "aria-label": "Додати раунд", style: { position: "fixed", right: 18, bottom: 98, width: 62, height: 62, borderRadius: "50%", background: `linear-gradient(135deg, ${T.gold}, #FFE29A)`, color: T.bg, border: "none", boxShadow: "0 10px 30px rgba(245,200,106,.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, hx(Plus, { size: 26 }));
 }
 
 /* Тексти правил на всіх мовах (uk — основна). */
@@ -2499,7 +2499,7 @@ function DebertsCounter() {
   return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(120% 100% at 50% -10%, ${T.bgAlt}, ${T.bg})`, color: T.text, fontFamily: "'Inter',sans-serif", paddingBottom: 84 } }, /* @__PURE__ */ React.createElement("style", null, FONT_IMPORT, `::selection{background:${T.gold}55} input:focus,textarea:focus{border-color:${T.gold} !important} @media (orientation:landscape){body{}}`), /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 16px 6px", maxWidth: 480, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TallyMark, { T }), /* @__PURE__ */ React.createElement("div", { className: "fx-title", style: { fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: 20 } }, "\u0414\u0435\u0431\u0435\u0440\u0446"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.textMuted, marginTop: 2 } }, "\u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456 \u043F\u0440\u0430\u0432\u0438\u043B\u0430")), /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("settings"), className: "fx-gear", "aria-label": "Налаштування", title: "Налаштування" }, /* @__PURE__ */ React.createElement(SettingsIcon, { size: 17, color: T.gold })), /* @__PURE__ */ React.createElement(
     "button",
     {
-      onClick: () => setGame((g) => ({ ...g, theme: g.theme === "dark" ? "light" : "dark" })),
+      "aria-label": "Змінити тему", onClick: () => setGame((g) => ({ ...g, theme: g.theme === "dark" ? "light" : "dark" })),
       style: { width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, display: "flex", alignItems: "center", justifyContent: "center" }
     },
     game.theme === "dark" ? /* @__PURE__ */ React.createElement(Sun, { size: 16, color: T.gold }) : /* @__PURE__ */ React.createElement(Moon, { size: 16, color: T.gold })
