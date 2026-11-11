@@ -399,6 +399,96 @@ Object.assign(DZ_I18N.ru, {
 Object.assign(DZ_I18N.en, { "Правила гри": "Game rules" });
 Object.assign(DZ_I18N.de, { "Правила гри": "Spielregeln" });
 Object.assign(DZ_I18N.ru, { "Правила гри": "Правила игры" });
+
+/* Динамічні фрази (числа, імена): перекладаються за шаблоном. */
+const DZ_PAT = {
+  en: [
+    [/^Сума очок взяток \((\d+)\) не дорівнює звичній \((\d+)\)\. Якщо це навмисно — можна продовжити\.$/, (m) => `Trick points total (${m[1]}) does not match the usual (${m[2]}). If this is intended, you can continue.`],
+    [/^Сума очок взяток \((\d+)\) перевищує можливу за роздачу \((\d+)\)\.$/, (m) => `Trick points total (${m[1]}) exceeds the round maximum (${m[2]}).`],
+    [/^Раздача №(\d+)$/, (m) => `Round #${m[1]}`],
+    [/^Раздача №(\d+)$/, (m) => `Round #${m[1]}`],
+    [/^Розділ (\d+)$/, (m) => `Round ${m[1]}`],
+    [/^Підтверджую: у (.+) дійсно ця комбінація$/, (m) => `Confirming: ${m[1]} really has this combination`],
+    [/^Взятки: (\d+)$/, (m) => `Tricks: ${m[1]}`],
+    [/^Разом: (.+)$/, (m) => `Total: ${m[1]}`],
+    [/^Комбінації: (.+)$/, (m) => `Combinations: ${m[1]}`],
+    [/^Рахунок: (.+)$/, (m) => `Score: ${m[1]}`],
+    [/^Поточний варіант: (.+)$/, (m) => `Current variant: ${m[1]}`],
+    [/^Гравців у грі: (\d+) — змінюється у діалозі «Нова гра»$/, (m) => `Players in game: ${m[1]} — change in the New game dialog`],
+    [/^Сума: (.+)$/, (m) => `Total: ${m[1]}`],
+    [/^Роздач: (\d+) · до (\d+)$/, (m) => `Rounds: ${m[1]} · to ${m[2]}`]
+  ],
+  de: [
+    [/^Сума очок взяток \((\d+)\) не дорівнює звичній \((\d+)\)\. Якщо це навмисно — можна продовжити\.$/, (m) => `Stichpunkte-Summe (${m[1]}) weicht vom Üblichen (${m[2]}) ab. Wenn das so gewollt ist, kannst du weitermachen.`],
+    [/^Сума очок взяток \((\d+)\) перевищує можливу за роздачу \((\d+)\)\.$/, (m) => `Stichpunkte-Summe (${m[1]}) übersteigt das Rundenmaximum (${m[2]}).`],
+    [/^Раздача №(\d+)$/, (m) => `Runde Nr. ${m[1]}`],
+    [/^Розділ (\d+)$/, (m) => `Runde ${m[1]}`],
+    [/^Взятки: (\d+)$/, (m) => `Stiche: ${m[1]}`],
+    [/^Разом: (.+)$/, (m) => `Gesamt: ${m[1]}`],
+    [/^Комбінації: (.+)$/, (m) => `Kombinationen: ${m[1]}`],
+    [/^Рахунок: (.+)$/, (m) => `Stand: ${m[1]}`],
+    [/^Поточний варіант: (.+)$/, (m) => `Aktuelle Variante: ${m[1]}`],
+    [/^Гравців у грі: (\d+) — змінюється у діалозі «Нова гра»$/, (m) => `Spieler im Spiel: ${m[1]} — ändern im Dialog „Neues Spiel“`],
+    [/^Сума: (.+)$/, (m) => `Summe: ${m[1]}`],
+    [/^Роздач: (\d+) · до (\d+)$/, (m) => `Runden: ${m[1]} · bis ${m[2]}`]
+  ],
+  ru: [
+    [/^Сума очок взяток \((\d+)\) не дорівнює звичній \((\d+)\)\. Якщо це навмисно — можна продовжити\.$/, (m) => `Сумма очков взяток (${m[1]}) не равна обычной (${m[2]}). Если так задумано — можно продолжить.`],
+    [/^Сума очок взяток \((\d+)\) перевищує можливу за роздачу \((\d+)\)\.$/, (m) => `Сумма очков взяток (${m[1]}) превышает максимум за раздачу (${m[2]}).`],
+    [/^Раздача №(\d+)$/, (m) => `Раздача №${m[1]}`],
+    [/^Розділ (\d+)$/, (m) => `Раздача ${m[1]}`],
+    [/^Взятки: (\d+)$/, (m) => `Взятки: ${m[1]}`],
+    [/^Разом: (.+)$/, (m) => `Итого: ${m[1]}`],
+    [/^Комбінації: (.+)$/, (m) => `Комбинации: ${m[1]}`],
+    [/^Рахунок: (.+)$/, (m) => `Счёт: ${m[1]}`],
+    [/^Поточний варіант: (.+)$/, (m) => `Текущий вариант: ${m[1]}`],
+    [/^Гравців у грі: (\d+) — змінюється у діалозі «Нова гра»$/, (m) => `Игроков в игре: ${m[1]} — меняется в диалоге «Новая игра»`],
+    [/^Сума: (.+)$/, (m) => `Сумма: ${m[1]}`],
+    [/^Роздач: (\d+) · до (\d+)$/, (m) => `Раздач: ${m[1]} · до ${m[2]}`]
+  ]
+};
+function dzPat(text, lang) {
+  const list = DZ_PAT[lang];
+  if (!list) return null;
+  for (const [re, fn] of list) { const m = text.match(re); if (m) return fn(m); }
+  return null;
+}
+Object.assign(DZ_I18N.en, {
+ "Натисніть «+», щоб додати першу.": "Tap “+” to add the first round.",
+ "Терц / полтинник / сотня: серед гравців рахується лише найбільша серія раунду, решта не зараховується. Марʼяж / белла рахується завжди.": "Terts / poltinnik / sotnya: among players only the longest run of the round counts. Marriage / bella always counts.",
+ " Підтвердити": " Confirm",
+ "Це ім'я бачать інші гравці, коли ви заходите в онлайн-кімнату. Зберігається на цьому пристрої.": "Other players see this name when you join an online room. It is saved on this device.",
+ "Поточний варіант:": "Current variant:",
+ "Гравців у грі:": "Players in game:",
+ " — змінюється у діалозі «Нова гра»": " — change it in the “New game” dialog",
+ "Це визначення показується гравцю при позначенні «Деберц» у роздачі — його потрібно явно підтвердити.": "This definition is shown to the player when “Debertz” is marked in a round. It must be confirmed explicitly.",
+ " Імпорт": " Import"
+});
+Object.assign(DZ_I18N.de, {
+ "Натисніть «+», щоб додати першу.": "Tippe auf „+“, um die erste Runde hinzuzufügen.",
+ "Терц / полтинник / сотня: серед гравців рахується лише найбільша серія раунду, решта не зараховується. Марʼяж / белла рахується завжди.": "Terz / Poltinnik / Sotnya: unter den Spielern zählt nur die längste Serie der Runde. Marriage / Bella zählt immer.",
+ " Підтвердити": " Bestätigen",
+ "Це ім'я бачать інші гравці, коли ви заходите в онлайн-кімнату. Зберігається на цьому пристрої.": "Andere Spieler sehen diesen Namen, wenn du einem Online-Raum beitrittst. Er wird auf diesem Gerät gespeichert.",
+ "Поточний варіант:": "Aktuelle Variante:",
+ "Гравців у грі:": "Spieler im Spiel:",
+ " — змінюється у діалозі «Нова гра»": " — ändern im Dialog „Neues Spiel“",
+ "Це визначення показується гравцю при позначенні «Деберц» у роздачі — його потрібно явно підтвердити.": "Diese Definition wird dem Spieler angezeigt, wenn „Debertz“ in einer Runde markiert wird. Sie muss ausdrücklich bestätigt werden.",
+ " Імпорт": " Import"
+});
+Object.assign(DZ_I18N.ru, {
+ "Натисніть «+», щоб додати першу.": "Нажмите «+», чтобы добавить первую раздачу.",
+ "Терц / полтинник / сотня: серед гравців рахується лише найбільша серія раунду, решта не зараховується. Марʼяж / белла рахується завжди.": "Терц / полтинник / сотня: среди игроков считается только самая старшая серия раздачи. Марьяж / белла считается всегда.",
+ " Підтвердити": " Подтвердить",
+ "Це ім'я бачать інші гравці, коли ви заходите в онлайн-кімнату. Зберігається на цьому пристрої.": "Это имя видят другие игроки, когда вы заходите в онлайн-комнату. Сохраняется на этом устройстве.",
+ "Поточний варіант:": "Текущий вариант:",
+ "Гравців у грі:": "Игроков в игре:",
+ " — змінюється у діалозі «Нова гра»": " — меняется в диалоге «Новая игра»",
+ "Це визначення показується гравцю при позначенні «Деберц» у роздачі — його потрібно явно підтвердити.": "Это определение показывается игроку при отметке «Деберц» в раздаче. Его нужно явно подтвердить.",
+ " Імпорт": " Импорт"
+});
+Object.assign(DZ_I18N.en, {"Поточний варіант: ":"Current variant: ","Гравців у грі: ":"Players in game: "});
+Object.assign(DZ_I18N.de, {"Поточний варіант: ":"Aktuelle Variante: ","Гравців у грі: ":"Spieler im Spiel: "});
+Object.assign(DZ_I18N.ru, {"Поточний варіант: ":"Текущий вариант: ","Гравців у грі: ":"Игроков в игре: "});
 /* Переклад тексту інтерфейсу: рядкові дочірні елементи й placeholder підміняються за мовою пристрою. */
 (function () {
   const orig = React.createElement;
@@ -410,7 +500,7 @@ Object.assign(DZ_I18N.ru, { "Правила гри": "Правила игры" }
     if (table) {
       for (let i = 2; i < args.length; i++) {
         const c = args[i];
-        if (typeof c === "string" && table[c] !== undefined) args[i] = table[c];
+        if (typeof c === "string") { if (table[c] !== undefined) args[i] = table[c]; else { const pt = dzPat(c, lang); if (pt) args[i] = pt; } }
       }
       if (props && typeof props.placeholder === "string" && table[props.placeholder] !== undefined) {
         args[1] = Object.assign({}, props, { placeholder: table[props.placeholder] });
@@ -1847,7 +1937,7 @@ function OnlineTab({ T, net, getLocalGame, onOpenGame }) {
 /* ===================== ОНОВЛЕННЯ ЗАСТОСУНКУ ===================== */
 /* Версію мітимо тут і піднімаємо при кожному релізі. Встановлений на головному екрані застосунок
    інакше тримає стару сторінку, тому перевіряємо свіжий index.html із сервера. */
-const APP_VERSION = "2026.11.11-8";
+const APP_VERSION = "2026.11.11-9";
 async function fetchLatestVersion() {
   const r = await fetch(location.pathname + "?vcheck=" + Date.now(), { cache: "no-store" });
   if (!r.ok) throw new Error("http " + r.status);
@@ -2079,64 +2169,134 @@ function FabAdd({ T, lock, myId, onOpen }) {
   return hx("button", { onClick: onOpen, className: "fx-glow", style: { position: "fixed", right: 18, bottom: 98, width: 62, height: 62, borderRadius: "50%", background: `linear-gradient(135deg, ${T.gold}, #FFE29A)`, color: T.bg, border: "none", boxShadow: "0 10px 30px rgba(245,200,106,.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, hx(Plus, { size: 26 }));
 }
 
+/* Тексти правил на всіх мовах (uk — основна). */
+const RULES_TX = {
+  uk: {
+    off: "вимкнено в налаштуваннях", instant: "миттєва перемога", manual: "вимкнено: очки додаються вручну",
+    underTricks: "лише очки взяток переходять суперникам, комбінації лишаються", underAll: "усі очки роздачі переходять суперникам",
+    yourSettings: "Ваші налаштування", kharkivVariant: "Харківський варіант", kicker: "ДЕБЕРЦ // ПРАВИЛА", rulesTitle: "Правила гри",
+    valuesBelow: "Значення нижче — з поточних налаштувань.",
+    goal: "Мета гри", goalText: (t) => `Гра йде до <b>${t} очок</b>. Після кожної роздачі очки додаються до рахунку. Переможець — той, хто першим перетнув ціль і має більше очок за суперників. Однакова сума — гра триває.`,
+    cardPoints: "Очки карт", otherCards: "Інші карти (6–9) — <b>0 очок</b>.",
+    totalText: (t) => `Сума очок взяток за роздачу — <b>${t}</b> (152 очки карт + 10 за останню взятку).`, totalOff: "Перевірку суми очок взяток вимкнено.",
+    combos: "Комбінації", comboText: "Рахується лише найстаріша з ряду терц / полтинник / сотня. Марʼяж можна поєднувати з нею.",
+    terc: "Терц", tercDesc: "3 карти поспіль однієї масті", poltinnik: "Полтинник", poltinnikDesc: "4 карти поспіль однієї масті",
+    sotnya: "Сотня", sotnyaDesc: "5 карт поспіль однієї масті", marriage: "Марʼяж · Белла", marriageDesc: "Король + дама однієї масті (козирні — белла)",
+    debertsTitle: "Деберц", debertsText: (d) => `<b>7 карт однієї масті поспіль</b> (від сімки до туза) — ${d}.`,
+    debertsWin: "ДЕБЕРЦ = ПЕРЕМОГА", debertsManual: "ДЕБЕРЦ = ОЧКИ ВРУЧНУ",
+    capotTitle: "Капот", capotText: (c) => `Усі взятки роздачі в <b>одного</b> гравця. Нагорода: ${c}. Інші в цій роздачі мають 0 взяток.`,
+    lygaTitle: "Лижа", zeroTricks: "0 взяток", lygaText: "Гравець, що не взяв жодної взятки в роздачі, отримує штраф.",
+    underTitle: "Недобір", underText: "Якщо замовник не набрав потрібної кількості очок, за обраним правилом його очки переходять суперникам.",
+    bidder: "Замовник", opponents: "Суперники", nowLabel: "Зараз:",
+    totalsTitle: "Підрахунок", fTricks: "взятки", fCombos: "комбінації", fCapot: "капот / лижа", fUnder: "недобір", fRound: "роздача",
+    totalsText: "Сума роздачі додається до рахунку. Деталі кожної роздачі — в «Історії», підсумки — у «Статистиці».",
+    changeText: "Усі числа й варіанти можна змінити в «Налаштуваннях»."
+  },
+  en: {
+    off: "off in Settings", instant: "instant win", manual: "off: points are added manually",
+    underTricks: "only trick points go to opponents, combinations stay", underAll: "all round points go to opponents",
+    yourSettings: "Your settings", kharkivVariant: "Kharkiv variant", kicker: "DEBERTZ // RULES", rulesTitle: "Game rules",
+    valuesBelow: "Values below come from the current settings.",
+    goal: "Goal", goalText: (t) => `The game goes to <b>${t} points</b>. After each round the points are added to the score. The winner is the first to cross the target with more points than the opponents. Equal totals: the game continues.`,
+    cardPoints: "Card points", otherCards: "Other cards (6–9) — <b>0 points</b>.",
+    totalText: (t) => `Trick points per round total <b>${t}</b> (152 card points + 10 for the last trick).`, totalOff: "The trick point total check is off.",
+    combos: "Combinations", comboText: "Only the highest of terts / poltinnik / sotnya counts. Marriage can be combined with it.",
+    terc: "Tertz", tercDesc: "3 cards in a row, same suit", poltinnik: "Poltinnik", poltinnikDesc: "4 cards in a row, same suit",
+    sotnya: "Sotnya", sotnyaDesc: "5 cards in a row, same suit", marriage: "Marriage · Bella", marriageDesc: "King + queen of one suit (trump: bella)",
+    debertsTitle: "Debertz", debertsText: (d) => `<b>7 cards of one suit in a row</b> (from seven to ace) — ${d}.`,
+    debertsWin: "DEBERTZ = WIN", debertsManual: "DEBERTZ = MANUAL POINTS",
+    capotTitle: "Capot", capotText: (c) => `All tricks of the round taken by <b>one</b> player. Bonus: ${c}. Others in this round have 0 tricks.`,
+    lygaTitle: "Lizha", zeroTricks: "0 tricks", lygaText: "A player who takes no tricks in a round gets a penalty.",
+    underTitle: "Shortfall", underText: "If the bidder does not reach the required points, the chosen rule moves their points to the opponents.",
+    bidder: "Bidder", opponents: "Opponents", nowLabel: "Now:",
+    totalsTitle: "Totals", fTricks: "tricks", fCombos: "combinations", fCapot: "capot / lizha", fUnder: "shortfall", fRound: "round",
+    totalsText: "The round total is added to the score. Round details are in History, totals in Stats.",
+    changeText: "All numbers and variants can be changed in Settings."
+  },
+  de: {
+    off: "in den Einstellungen aus", instant: "sofortiger Sieg", manual: "aus: Punkte werden manuell addiert",
+    underTricks: "nur Stichpunkte gehen an die Gegner, Kombinationen bleiben", underAll: "alle Rundenpunkte gehen an die Gegner",
+    yourSettings: "Deine Einstellungen", kharkivVariant: "Charkiwer Variante", kicker: "DEBERTZ // REGELN", rulesTitle: "Spielregeln",
+    valuesBelow: "Die Werte unten stammen aus den aktuellen Einstellungen.",
+    goal: "Spielziel", goalText: (t) => `Das Spiel geht bis <b>${t} Punkte</b>. Nach jeder Runde werden die Punkte zum Stand addiert. Gewinner ist, wer das Ziel zuerst mit mehr Punkten als die Gegner erreicht. Bei Gleichstand läuft das Spiel weiter.`,
+    cardPoints: "Kartenpunkte", otherCards: "Andere Karten (6–9) — <b>0 Punkte</b>.",
+    totalText: (t) => `Stichpunkte pro Runde insgesamt <b>${t}</b> (152 Kartenpunkte + 10 für den letzten Stich).`, totalOff: "Die Prüfung der Stichpunkte ist aus.",
+    combos: "Kombinationen", comboText: "Nur die höchste aus Terz / Poltinnik / Sotnya zählt. Marriage kann damit kombiniert werden.",
+    terc: "Terz", tercDesc: "3 Karten in Folge, gleiche Farbe", poltinnik: "Poltinnik", poltinnikDesc: "4 Karten in Folge, gleiche Farbe",
+    sotnya: "Sotnya", sotnyaDesc: "5 Karten in Folge, gleiche Farbe", marriage: "Marriage · Bella", marriageDesc: "König + Dame einer Farbe (Trumpf: Bella)",
+    debertsTitle: "Debertz", debertsText: (d) => `<b>7 Karten einer Farbe in Folge</b> (von der Sieben bis zum Ass) — ${d}.`,
+    debertsWin: "DEBERTZ = SIEG", debertsManual: "DEBERTZ = PUNKTE MANUELL",
+    capotTitle: "Capot", capotText: (c) => `Alle Stiche der Runde von <b>einem</b> Spieler. Bonus: ${c}. Die anderen haben in dieser Runde 0 Stiche.`,
+    lygaTitle: "Lischa", zeroTricks: "0 Stiche", lygaText: "Wer in einer Runde keinen Stich macht, erhält eine Strafe.",
+    underTitle: "Unterbieten", underText: "Erreicht der Ansager nicht die nötige Punktzahl, gehen seine Punkte nach der gewählten Regel an die Gegner.",
+    bidder: "Ansager", opponents: "Gegner", nowLabel: "Jetzt:",
+    totalsTitle: "Zählung", fTricks: "Stiche", fCombos: "Kombinationen", fCapot: "Capot / Lischa", fUnder: "Unterbieten", fRound: "Runde",
+    totalsText: "Die Rundensumme wird zum Stand addiert. Details stehen im Verlauf, Summen in der Statistik.",
+    changeText: "Alle Zahlen und Varianten kannst du in den Einstellungen ändern."
+  },
+  ru: {
+    off: "выключено в настройках", instant: "мгновенная победа", manual: "выключено: очки добавляются вручную",
+    underTricks: "только очки взяток переходят соперникам, комбинации остаются", underAll: "все очки раздачи переходят соперникам",
+    yourSettings: "Ваши настройки", kharkivVariant: "Харьковский вариант", kicker: "ДЕБЕРЦ // ПРАВИЛА", rulesTitle: "Правила игры",
+    valuesBelow: "Значения ниже — из текущих настроек.",
+    goal: "Цель игры", goalText: (t) => `Игра идёт до <b>${t} очков</b>. После каждой раздачи очки добавляются к счёту. Победитель — тот, кто первым пересёк цель и имеет больше очков, чем соперники. При равной сумме игра продолжается.`,
+    cardPoints: "Очки карт", otherCards: "Остальные карты (6–9) — <b>0 очков</b>.",
+    totalText: (t) => `Сумма очков взяток за раздачу — <b>${t}</b> (152 очка карт + 10 за последнюю взятку).`, totalOff: "Проверка суммы очков взяток выключена.",
+    combos: "Комбинации", comboText: "Считается только старшая из терц / полтинник / сотня. Марьяж можно сочетать с ней.",
+    terc: "Терц", tercDesc: "3 карты подряд одной масти", poltinnik: "Полтинник", poltinnikDesc: "4 карты подряд одной масти",
+    sotnya: "Сотня", sotnyaDesc: "5 карт подряд одной масти", marriage: "Марьяж · Белла", marriageDesc: "Король + дама одной масти (козыри — белла)",
+    debertsTitle: "Деберц", debertsText: (d) => `<b>7 карт одной масти подряд</b> (от семёрки до туза) — ${d}.`,
+    debertsWin: "ДЕБЕРЦ = ПОБЕДА", debertsManual: "ДЕБЕРЦ = ОЧКИ ВРУЧНУЮ",
+    capotTitle: "Капот", capotText: (c) => `Все взятки раздачи у <b>одного</b> игрока. Награда: ${c}. У остальных в этой раздаче 0 взяток.`,
+    lygaTitle: "Лыжа", zeroTricks: "0 взяток", lygaText: "Игрок, не взявший ни одной взятки в раздаче, получает штраф.",
+    underTitle: "Недобор", underText: "Если заказчик не набрал нужного количества очков, по выбранному правилу его очки переходят соперникам.",
+    bidder: "Заказчик", opponents: "Соперники", nowLabel: "Сейчас:",
+    totalsTitle: "Подсчёт", fTricks: "взятки", fCombos: "комбинации", fCapot: "капот / лыжа", fUnder: "недобор", fRound: "раздача",
+    totalsText: "Сумма раздачи добавляется к счёту. Детали каждой раздачи — в «Истории», итоги — в «Статистике».",
+    changeText: "Все числа и варианты можно изменить в «Настройках»."
+  }
+};
 function rulesHtml(s) {
+  const L = lsGet("debertz:lang", "uk");
+  const tx = RULES_TX[RULES_TX[L] ? L : "uk"];
   const cv = s.comboValues || {};
   const row = (cards) => `<div class="dzr-row">${cards}</div>`;
   const tag = (t) => `<span class="dzr-tag">${t}</span>`;
   const sec = (n, title, body) => `<section class="dzr-sec"><div class="dzr-num">${n}</div><h2>${title}</h2>${body}</section>`;
   const p = (t) => `<p>${t}</p>`;
   const combo = (name, desc, cards, value) => `<div class="dzr-combo"><div class="dzr-combo-head"><span>${name}</span><span class="dzr-val">${value}</span></div><div class="dzr-hint">${desc}</div>${row(cards)}</div>`;
+  const col = (card, pts) => `<div>${card}<span class="dzr-tag">${pts}</span></div>`;
   const target = Number(s.targetScore) || 1001;
   const total = s.totalPointsEnabled ? Number(s.totalPoints) || 162 : null;
-  const capot = s.capotEnabled ? `<b>+${s.capotBonus}</b>` : "вимкнено в налаштуваннях";
-  const lyga = s.noTricksEnabled ? `<b>−${s.noTricksPenalty}</b>` : "вимкнено в налаштуваннях";
-  const deb = s.debertsInstantWin ? "миттєва перемога" : "вимкнено: очки додаються вручну";
-  const under = s.underTargetRule === "trick_only"
-    ? "лише очки взяток переходять суперникам, комбінації лишаються"
-    : s.underTargetRule === "off" ? "вимкнено в налаштуваннях" : "усі очки роздачі переходять суперникам";
-  const variant = s.rulesVariant === "custom" ? "Ваші налаштування" : "Харківський варіант";
+  const capot = s.capotEnabled ? `<b>+${s.capotBonus}</b>` : tx.off;
+  const lyga = s.noTricksEnabled ? `<b>−${s.noTricksPenalty}</b>` : tx.off;
+  const deb = s.debertsInstantWin ? tx.instant : tx.manual;
+  const under = s.underTargetRule === "trick_only" ? tx.underTricks : s.underTargetRule === "off" ? tx.off : tx.underAll;
+  const variant = s.rulesVariant === "custom" ? tx.yourSettings : tx.kharkivVariant;
 
-  const hero = `<header class="dzr-hero"><div class="dzr-kicker">ДЕБЕРЦ // ПРАВИЛА</div><h1>Правила гри</h1><p>${variant}. Значення нижче — з поточних налаштувань.</p></header>`;
-
-  const s1 = sec("01", "Мета гри",
-    p(`Гра йде до <b>${target} очок</b>. Після кожної роздачі очки додаються до рахунку. Переможець — той, хто першим перетнув ціль і має більше очок за суперників. Однакова сума — гра триває.`) +
+  const hero = `<header class="dzr-hero"><div class="dzr-kicker">${tx.kicker}</div><h1>${tx.rulesTitle}</h1><p>${variant}. ${tx.valuesBelow}</p></header>`;
+  const s1 = sec("01", tx.goal,
+    p(tx.goalText(target)) +
     `<div class="dzr-bar"><i style="width:100%"></i><span style="left:0">0</span><span style="left:50%">${Math.round(target / 2)}</span><span style="right:0">${target}</span></div>`);
-
-  const col = (card, pts) => `<div>${card}<span class="dzr-tag">${pts}</span></div>`;
-  const s2 = sec("02", "Очки карт",
+  const s2 = sec("02", tx.cardPoints,
     `<div class="dzr-cards5">${col(dzCard("A", "♠"), "11")}${col(dzCard("10", "♥"), "10")}${col(dzCard("K", "♦"), "4")}${col(dzCard("Q", "♣"), "3")}${col(dzCard("J", "♠"), "2")}</div>` +
-    p(`Інші карти (6–9) — <b>0 очок</b>.` + (total ? ` Сума очок взяток за роздачу — <b>${total}</b> (152 очки карт + 10 за останню взятку).` : " Перевірку суми очок взяток вимкнено."))) ;
-
-  const s3 = sec("03", "Комбінації",
-    p("Рахується лише <b>найстаріша</b> з ряду терц / полтинник / сотня. Марʼяж можна поєднувати з нею.") +
-    combo("Терц", "3 карти поспіль однієї масті", dzCard("9", "♦") + dzCard("10", "♦") + dzCard("J", "♦"), `+${cv.terc}`) +
-    combo("Полтинник", "4 карти поспіль однієї масті", dzCard("9", "♣") + dzCard("10", "♣") + dzCard("J", "♣") + dzCard("Q", "♣"), `+${cv.poltinnik}`) +
-    combo("Сотня", "5 карт поспіль однієї масті", dzCard("9", "♠") + dzCard("10", "♠") + dzCard("J", "♠") + dzCard("Q", "♠") + dzCard("K", "♠"), `+${cv.sotnya}`) +
-    combo("Марʼяж · Белла", "Король + дама однієї масті (козирні — белла)", dzCard("K", "♥", true) + dzCard("Q", "♥", true), `+${cv.marriage}`));
-
-  const s4 = sec("04", "Деберц",
-    p("<b>7 карт однієї масті поспіль</b> (від сімки до туза) — " + deb + ".") +
+    p(tx.otherCards + (total ? " " + tx.totalText(total) : " " + tx.totalOff)));
+  const s3 = sec("03", tx.combos,
+    p(tx.comboText) +
+    combo(tx.terc, tx.tercDesc, dzCard("9", "♦") + dzCard("10", "♦") + dzCard("J", "♦"), `+${cv.terc}`) +
+    combo(tx.poltinnik, tx.poltinnikDesc, dzCard("9", "♣") + dzCard("10", "♣") + dzCard("J", "♣") + dzCard("Q", "♣"), `+${cv.poltinnik}`) +
+    combo(tx.sotnya, tx.sotnyaDesc, dzCard("9", "♠") + dzCard("10", "♠") + dzCard("J", "♠") + dzCard("Q", "♠") + dzCard("K", "♠"), `+${cv.sotnya}`) +
+    combo(tx.marriage, tx.marriageDesc, dzCard("K", "♥", true) + dzCard("Q", "♥", true), `+${cv.marriage}`));
+  const s4 = sec("04", tx.debertsTitle,
+    p(tx.debertsText(deb)) +
     row(["7", "8", "9", "10", "J", "Q", "K", "A"].map((r) => dzCard(r, "♥", true)).join("")) +
-    `<div class="dzr-tag dzr-tag-big">${s.debertsInstantWin ? "ДЕБЕРЦ = ПЕРЕМОГА" : "ДЕБЕРЦ = ОЧКИ ВРУЧНУ"}</div>`);
-
-  const s5 = sec("05", "Капот",
-    `<div class="dzr-big">♛</div>` +
-    p(`Усі взятки роздачі в <b>одного</b> гравця. Нагорода: ${capot}. Інші в цій роздачі мають 0 взяток.`));
-
-  const s6 = sec("06", "Лижа",
-    `<div class="dzr-flow"><span>0 взяток</span><b>→</b><span class="neg">${lyga}</span></div>` +
-    p("Гравець, що не взяв жодної взятки в роздачі, отримує штраф."));
-
-  const s7 = sec("07", "Недобір",
-    p("Якщо замовник не набрав потрібної кількості очок, за обраним правилом його очки переходять суперникам.") +
-    `<div class="dzr-flow"><span>Замовник</span><b>→</b><span>Суперники</span></div>` +
-    `<div class="dzr-hint">Зараз: <b>${under}</b>.</div>`);
-
-  const s8 = sec("08", "Підрахунок",
-    `<div class="dzr-formula"><span>взятки</span>+<span>комбінації</span>±<span>капот / лижа</span>±<span>недобір</span>=<b>роздача</b></div>` +
-    p("Сума роздачі додається до рахунку. Деталі кожної роздачі — в «Історії», підсумки — у «Статистиці».") +
-    p("Усі числа й варіанти можна змінити в «Налаштуваннях»."));
-
+    `<div class="dzr-tag dzr-tag-big">${s.debertsInstantWin ? tx.debertsWin : tx.debertsManual}</div>`);
+  const s5 = sec("05", tx.capotTitle, `<div class="dzr-big">♛</div>` + p(tx.capotText(capot)));
+  const s6 = sec("06", tx.lygaTitle, `<div class="dzr-flow"><span>${tx.zeroTricks}</span><b>→</b><span class="neg">${lyga}</span></div>` + p(tx.lygaText));
+  const s7 = sec("07", tx.underTitle, p(tx.underText) + `<div class="dzr-flow"><span>${tx.bidder}</span><b>→</b><span>${tx.opponents}</span></div>` + `<div class="dzr-hint">${tx.nowLabel} <b>${under}</b>.</div>`);
+  const s8 = sec("08", tx.totalsTitle,
+    `<div class="dzr-formula"><span>${tx.fTricks}</span>+<span>${tx.fCombos}</span>±<span>${tx.fCapot}</span>±<span>${tx.fUnder}</span>=<b>${tx.fRound}</b></div>` +
+    p(tx.totalsText) + p(tx.changeText));
   return hero + s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8;
 }
 const RULES_EXTRA_CSS = `
