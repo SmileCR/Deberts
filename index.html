@@ -106,6 +106,11 @@ html[data-theme="light"] #root div[style*="border-radius: 24px"] { box-shadow: i
 #root button[style*="linear-gradient"] { letter-spacing: 0.1px; }
 #root .fx-title { font-weight: 800; }
 
+/* ---- Liquid Glass (світла тема): скло з блік, глибина, повітряний фон ---- */
+html[data-theme="light"] #root div[style*="border-radius: 24px"] { backdrop-filter: blur(24px) saturate(170%) !important; -webkit-backdrop-filter: blur(24px) saturate(170%) !important; background-image: linear-gradient(155deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.25) 60%) !important; }
+html[data-theme="light"] #root div[style*="position: fixed"][style*="bottom: calc(10px"] { backdrop-filter: blur(28px) saturate(180%) !important; -webkit-backdrop-filter: blur(28px) saturate(180%) !important; background: rgba(255, 255, 255, 0.55) !important; box-shadow: 0 18px 40px rgba(30, 80, 70, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important; }
+html[data-theme="light"] #root .fx-title { background: linear-gradient(90deg, #0B2620 0%, #0E7C9A 35%, #B27A22 55%, #0E7C9A 75%, #0B2620 100%); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -480,20 +485,20 @@ const THEMES = {
     overlay: "rgba(2, 8, 6, 0.66)"
   },
   light: {
-    bg: "#EEF6F1",
-    bgAlt: "#DCEEE5",
-    panel: "rgba(255, 255, 255, 0.72)",
-    panelAlt: "rgba(232, 246, 239, 0.92)",
-    border: "rgba(14, 124, 154, 0.22)",
-    text: "#0F2A22",
-    textMuted: "#4D6B60",
+    bg: "#EDF5F1",
+    bgAlt: "#DDEEE6",
+    panel: "rgba(255, 255, 255, 0.58)",
+    panelAlt: "rgba(255, 255, 255, 0.78)",
+    border: "rgba(255, 255, 255, 0.85)",
+    text: "#0B2620",
+    textMuted: "#56756A",
     gold: "#B07A1E",
     goldSoft: "rgba(176, 122, 30, 0.12)",
     danger: "#C2412F",
     dangerSoft: "rgba(194, 65, 47, 0.10)",
     warn: "#9A6B12",
     warnSoft: "rgba(154, 107, 18, 0.12)",
-    shadow: "0 14px 40px rgba(20, 60, 50, 0.14)",
+    shadow: "0 22px 50px rgba(30, 80, 70, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.95)",
     overlay: "rgba(10, 30, 24, 0.4)"
   }
 };
@@ -516,7 +521,7 @@ const defaultGame = () => ({
   players: { p1: "", p2: "", p3: "", p4: "" },
   rounds: [],
   settings: { ...defaultSettings(), ...readPrefsSettings() },
-  theme: "dark",
+  theme: "light",
   setupDone: false
 });
 function Modal({ children, onClose, T, maxWidth = 460 }) {
@@ -1085,6 +1090,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
   const [notice, setNotice] = useState(null);
   const [lobbyRooms, setLobbyRooms] = useState([]);
   const [lobbyLoading, setLobbyLoading] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [lock, setLockState] = useState(null);
   const chRef = useRef(null);
   const sessionRef = useRef(null);
@@ -1155,6 +1161,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     }
     setLockState(null);
     setRoom(null);
+    setIsOwner(false);
     setStatus("offline");
   };
 
@@ -1212,8 +1219,9 @@ function useRoomNet(onRemoteGame, getLocalGame) {
       }
     }
 
-    const s = { code, cid, nick, subscribed: false };
+    const s = { code, cid, nick, subscribed: false, isHost: !!isHost };
     sessionRef.current = s;
+    setIsOwner(!!isHost);
     const ch = sb.channel("deberts:room:" + code, { config: { presence: { key: cid }, broadcast: { self: false } } });
     chRef.current = ch;
     lsSet(SESSION_KEY, JSON.stringify({ code, nick, isHost, mode: "restore" }));
@@ -1310,6 +1318,10 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     const s = sessionRef.current;
     const ch = chRef.current;
     if (!s) return;
+    if (!s.isHost) {
+      setNotice("Закрити кімнату може лише той, хто її створив.");
+      return;
+    }
     if (ch) {
       try { await ch.send({ type: "broadcast", event: "closed", payload: {} }); } catch (e) {}
     }
@@ -1322,7 +1334,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
   }, []);
-  return { status, room, notice, setNotice, lobbyRooms, lobbyLoading, refreshLobby, createRoom, joinRoom, restore, leave, closeRoom, sendState, lock, setLock };
+  return { status, room, notice, setNotice, isOwner, lobbyRooms, lobbyLoading, refreshLobby, createRoom, joinRoom, restore, leave, closeRoom, sendState, lock, setLock };
 }
 function OnlineNameField({ T }) {
   const [name, setName] = useState(() => lsGet(NICK_KEY, ""));
@@ -1383,7 +1395,7 @@ function OnlineTab({ T, net, getLocalGame, onOpenGame }) {
 
   if (net.room) {
     const r = net.room;
-    const isHost = r.hostId === r.you;
+    const isHost = !!net.isOwner;
     const link = `${location.href.split("?")[0]}?room=${r.code}`;
     const copy = () => {
       const done = () => net.setNotice("Посилання скопійовано.");
