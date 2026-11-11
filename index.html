@@ -1090,8 +1090,8 @@ function useRoomNet(onRemoteGame, getLocalGame) {
   const [notice, setNotice] = useState(null);
   const [lobbyRooms, setLobbyRooms] = useState([]);
   const [lobbyLoading, setLobbyLoading] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
   const [lock, setLockState] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
   const chRef = useRef(null);
   const sessionRef = useRef(null);
   const saveTimerRef = useRef(null);
@@ -1103,10 +1103,11 @@ function useRoomNet(onRemoteGame, getLocalGame) {
   remoteRef.current = onRemoteGame;
   localRef.current = getLocalGame;
 
-  /* ---------- База даних (збереження стану, без затримки для вигляду) ---------- */
+  /* ---------- Дані кімнати: лише через функції бази (прямого доступу до таблиці немає) ---------- */
+  const rpc = (fn, args) => getSb().rpc(fn, args);
   const dbSave = async (code, state, at) => {
     try {
-      await getSb().from(ROOMS_TABLE).update({ state, updated_at: new Date(at || Date.now()).toISOString() }).eq("code", code);
+      await rpc("save_room_state", { p_code: code, p_state: state, p_at: new Date(at || Date.now()).toISOString() });
     } catch (e) {}
   };
   const flushSave = () => {
@@ -1123,13 +1124,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
   const refreshLobby = async () => {
     setLobbyLoading(true);
     try {
-      const since = new Date(Date.now() - ROOM_TTL_MS).toISOString();
-      const { data, error } = await getSb().from(ROOMS_TABLE)
-        .select("code,name,host_name,updated_at")
-        .eq("is_public", true)
-        .gte("updated_at", since)
-        .order("updated_at", { ascending: false })
-        .limit(30);
+      const { data, error } = await rpc("list_public_rooms", {});
       if (error) throw error;
       setLobbyRooms((data || []).map((r) => ({ code: r.code, name: r.name, hostName: r.host_name, updatedAt: r.updated_at })));
     } catch (e) {
@@ -1186,7 +1181,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     if (s.subscribed) ch.send({ type: "broadcast", event: "lock", payload: { cid: s.cid, name: s.nick, on: !!on } });
   };
 
-  const enter = async ({ code, nick, isHost, mode, roomName, isPublic }) => {
+  const enter = async ({ code, nick, isHost, mode, roomName, isPublic, token }) => {
     const cid = getClientId();
     const sb = getSb();
     setStatus("connecting");
@@ -1195,36 +1190,39 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     let info = null;
     if (mode === "create") {
       const at = Date.now();
-      const row = { code, name: roomName, is_public: isPublic, host_name: nick, state: localRef.current(), updated_at: new Date(at).toISOString() };
-      const { error } = await sb.from(ROOMS_TABLE).insert(row);
+      const state = localRef.current();
+      const { error } = await rpc("create_room", {
+        p_code: code, p_name: roomName, p_public: !!isPublic, p_host: nick, p_state: state, p_token: token
+      });
       if (error) { setNotice("Не вдалося створити кімнату. Спробуйте ще раз."); setStatus("offline"); return false; }
-      info = { name: roomName, is_public: isPublic };
+      info = { name: roomName, is_public: !!isPublic };
       lastAtRef.current = at;
     } else {
-      const { data, error } = await sb.from(ROOMS_TABLE).select("name,is_public,state,updated_at").eq("code", code).maybeSingle();
+      const { data, error } = await rpc("get_room", { p_code: code });
       if (error) { setNotice("Немає зв'язку з сервером. Перевірте інтернет."); setStatus("offline"); return false; }
-      if (!data) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) {
         lsDel(SESSION_KEY);
         setNotice("Кімнату з таким кодом не знайдено.");
         setStatus("offline");
         return false;
       }
-      info = { name: data.name, is_public: data.is_public };
-      const at = new Date(data.updated_at).getTime();
-      if (data.state) {
-        applyRemote(data.state, at);
+      info = { name: row.name, is_public: row.is_public };
+      const at = new Date(row.updated_at).getTime();
+      if (row.state) {
+        applyRemote(row.state, at);
       } else {
         lastAtRef.current = Date.now();
         await dbSave(code, localRef.current(), lastAtRef.current);
       }
     }
 
-    const s = { code, cid, nick, subscribed: false, isHost: !!isHost };
+    const s = { code, cid, nick, subscribed: false, isHost: !!isHost, token: isHost ? token : null };
     sessionRef.current = s;
     setIsOwner(!!isHost);
     const ch = sb.channel("deberts:room:" + code, { config: { presence: { key: cid }, broadcast: { self: false } } });
     chRef.current = ch;
-    lsSet(SESSION_KEY, JSON.stringify({ code, nick, isHost, mode: "restore" }));
+    lsSet(SESSION_KEY, JSON.stringify({ code, nick, isHost: !!isHost, token: isHost ? token : null, mode: "restore" }));
 
     const syncRoom = () => {
       if (chRef.current !== ch) return;
@@ -1264,7 +1262,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
       if (chRef.current !== ch) return;
       if (st === "SUBSCRIBED") {
         s.subscribed = true;
-        await ch.track({ id: cid, name: nick, host: isHost, at: Date.now() });
+        await ch.track({ id: cid, name: nick, host: !!isHost, at: Date.now() });
         setStatus("online");
       } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
         s.subscribed = false;
@@ -1277,8 +1275,10 @@ function useRoomNet(onRemoteGame, getLocalGame) {
   const createRoom = async ({ nick, roomName, isPublic }) => {
     teardown(false);
     const code = makeRoomCode();
-    const ok = await enter({ code, nick, isHost: true, mode: "create", roomName, isPublic });
-    if (ok) lsSet(SESSION_KEY, JSON.stringify({ code, nick, isHost: true, mode: "restore" }));
+    // Секретний токен власника: лише на цьому пристрої, сервер перевіряє його при закритті.
+    const token = (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : "") + (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+    const ok = await enter({ code, nick, isHost: true, mode: "create", roomName, isPublic, token });
+    if (!ok) lsDel(SESSION_KEY);
   };
   const joinRoom = async ({ code, nick }) => {
     teardown(false);
@@ -1291,7 +1291,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     let sess = null;
     try { sess = JSON.parse(raw); } catch (e) {}
     if (!sess || !sess.code) { lsDel(SESSION_KEY); return; }
-    await enter({ code: sess.code, nick: sess.nick || "Гравець", isHost: !!sess.isHost, mode: "restore" });
+    await enter({ code: sess.code, nick: sess.nick || "Гравець", isHost: !!sess.isHost, mode: "restore", token: sess.token || null });
   };
   /* Підтягнути стан з бази, коли вкладка знову активна (на випадок пропущених повідомлень). */
   useEffect(() => {
@@ -1299,8 +1299,9 @@ function useRoomNet(onRemoteGame, getLocalGame) {
       const s = sessionRef.current;
       if (!s || document.visibilityState !== "visible") return;
       try {
-        const { data } = await getSb().from(ROOMS_TABLE).select("state,updated_at").eq("code", s.code).maybeSingle();
-        if (data && data.state) applyRemote(data.state, new Date(data.updated_at).getTime());
+        const { data } = await rpc("get_room", { p_code: s.code });
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row && row.state) applyRemote(row.state, new Date(row.updated_at).getTime());
       } catch (e) {}
     };
     document.addEventListener("visibilitychange", onBack);
@@ -1318,14 +1319,19 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     const s = sessionRef.current;
     const ch = chRef.current;
     if (!s) return;
-    if (!s.isHost) {
+    if (!s.isHost || !s.token) {
+      setNotice("Закрити кімнату може лише той, хто її створив.");
+      return;
+    }
+    // Сервер перевіряє токен власника; без збігу кімната не видаляється.
+    const { data, error } = await rpc("delete_room", { p_code: s.code, p_token: s.token });
+    if (error || data !== true) {
       setNotice("Закрити кімнату може лише той, хто її створив.");
       return;
     }
     if (ch) {
       try { await ch.send({ type: "broadcast", event: "closed", payload: {} }); } catch (e) {}
     }
-    try { await getSb().from(ROOMS_TABLE).delete().eq("code", s.code); } catch (e) {}
     teardown(false);
     setNotice("Кімнату закрито.");
   };
