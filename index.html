@@ -495,6 +495,9 @@ Object.assign(DZ_I18N.ru, {"Поточний варіант: ":"Текущий �
 Object.assign(DZ_I18N.en, {"Застосує типові налаштування: гра до 1001, лижа −50, недобір — усі очки суперникам, деберц — миттєва перемога. Усе можна змінити пізніше у налаштуваннях.":"Applies the usual settings: play to 1001, lizha −50, shortfall: all points to the opponents, debertz: instant win. Everything can be changed later in Settings."});
 Object.assign(DZ_I18N.de, {"Застосує типові налаштування: гра до 1001, лижа −50, недобір — усі очки суперникам, деберц — миттєва перемога. Усе можна змінити пізніше у налаштуваннях.":"Übernimmt die üblichen Einstellungen: bis 1001, Lischa −50, Unterbieten: alle Punkte an die Gegner, Debertz: sofortiger Sieg. Alles lässt sich später in den Einstellungen ändern."});
 Object.assign(DZ_I18N.ru, {"Застосує типові налаштування: гра до 1001, лижа −50, недобір — усі очки суперникам, деберц — миттєва перемога. Усе можна змінити пізніше у налаштуваннях.":"Применит типичные настройки: игра до 1001, лыжа −50, недобор: все очки соперникам, деберц: мгновенная победа. Всё можно изменить позже в настройках."});
+Object.assign(DZ_I18N.en, {"Режим гри":"Game mode","Кожен за себе":"Everyone for themselves","2×2 — команди":"2×2 — teams","Байт: ":"Bayt: "});
+Object.assign(DZ_I18N.de, {"Режим гри":"Spielmodus","Кожен за себе":"Jeder für sich","2×2 — команди":"2×2 — Teams","Байт: ":"Bajt: "});
+Object.assign(DZ_I18N.ru, {"Режим гри":"Режим игры","Кожен за себе":"Каждый за себя","2×2 — команди":"2×2 — команды","Байт: ":"Байт: "});
 /* Переклад тексту інтерфейсу: рядкові дочірні елементи й placeholder підміняються за мовою пристрою. */
 (function () {
   const orig = React.createElement;
@@ -613,7 +616,9 @@ const defaultSettings = () => ({
   debertsDefinitionKey: "run7",
   // 'run7' | 'custom'
   debertsDefinitionCustom: "",
-  comboValues: { terc: 20, poltinnik: 50, sotnya: 100, marriage: 20 }
+  comboValues: { terc: 20, poltinnik: 50, sotnya: 100, marriage: 20 },
+  teamMode: false,
+  teamBayt: true
 });
 function isKharkivPreset(s) {
   const d = defaultSettings();
@@ -628,6 +633,7 @@ function playersArray(game) {
   return ids.map((id, i) => ({ id, name: game.players[id] || "", idx: i }));
 }
 function playerName(game, id) {
+  if (game.settings && game.settings.teamMode && (id === "t0" || id === "t1")) return teamLabel(game, id);
   const i = ["p1", "p2", "p3", "p4"].indexOf(id);
   return game.players[id] && game.players[id].trim() || DEFAULT_NAMES[i] || id;
 }
@@ -655,6 +661,7 @@ function calculateUnderTarget(form, players, settings) {
   if (!form.callerId || !form.underTarget || settings.underTargetRule === "off") {
     return { perPlayer: result, message: null };
   }
+  if (settings.teamMode && players.length === 4) return calculateTeamUnderTarget(form, players, settings);
   const caller = form.perPlayer[form.callerId];
   const callerTrick = Number(caller.trick) || 0;
   const callerCombos = comboSum(caller, settings.comboValues);
@@ -731,9 +738,80 @@ function computeRound(form, players, settings) {
       final: val
     };
   });
+  if (settings.teamMode && players.length === 4 && form.callerId && !form.underTarget && settings.teamBayt !== false) {
+    const cT = teamKey(form.callerId);
+    const other = cT === "t0" ? "t1" : "t0";
+    const sumOf = (k) => players.filter((p) => teamKey(p.id) === k).reduce((s, p) => s + (finals[p.id] || 0), 0);
+    const mine = sumOf(cT);
+    if (mine < sumOf(other)) {
+      const oppMembers = players.filter((p) => teamKey(p.id) === other);
+      const first = Math.floor(mine / 2);
+      players.forEach((p) => { if (teamKey(p.id) === cT) { finals[p.id] = 0; breakdown[p.id] = { ...breakdown[p.id], final: 0, transferred: 0 }; } });
+      oppMembers.forEach((p, i) => { const add = i === 0 ? first : mine - first; finals[p.id] = (finals[p.id] || 0) + add; breakdown[p.id] = { ...breakdown[p.id], transferred: (breakdown[p.id].transferred || 0) + add, final: finals[p.id] }; });
+      return { finals, breakdown, underTargetMessage: "Байт: " + players.filter((p) => teamKey(p.id) === cT).map((p) => p.displayName).join(" + ") + " набрала менше за суперників, очки переходять суперникам." };
+    }
+  }
   return { finals, breakdown, underTargetMessage };
 }
+/* Команди 2×2: p1+p3 проти p2+p4 (партнери сидять навпроти). */
+function teamKey(id) { return "t" + (["p1", "p2", "p3", "p4"].indexOf(id) % 2); }
+function teamLabel(game, k) {
+  const ids = k === "t0" ? ["p1", "p3"] : ["p2", "p4"];
+  return ids.map((id) => playerName(game, id)).join(" + ");
+}
+function evaluateTeamEnd(rounds, players, settings) {
+  const keys = ["t0", "t1"];
+  const cum = {};
+  players.forEach((p) => cum[p.id] = 0);
+  const tcum = { t0: 0, t1: 0 };
+  const cumTimeline = [];
+  let finished = false, winner = null, finishedAtIndex = null, reason = null;
+  rounds.forEach((r, i) => {
+    players.forEach((p) => { cum[p.id] += r.finals[p.id] || 0; });
+    keys.forEach((k) => { tcum[k] = players.filter((p) => teamKey(p.id) === k).reduce((s, p) => s + cum[p.id], 0); });
+    cumTimeline.push({ ...cum });
+    if (finished) return;
+    if (r.debertsPlayerId && r.debertsConfirmed && settings.debertsInstantWin) {
+      finished = true; winner = teamKey(r.debertsPlayerId); finishedAtIndex = i; reason = "deberts";
+      return;
+    }
+    const crossed = keys.filter((k) => tcum[k] >= settings.targetScore);
+    if (crossed.length === 1) {
+      finished = true; winner = crossed[0]; finishedAtIndex = i; reason = "target";
+    } else if (crossed.length === 2 && tcum.t0 !== tcum.t1) {
+      finished = true; winner = tcum.t0 > tcum.t1 ? "t0" : "t1"; finishedAtIndex = i; reason = "target";
+    }
+  });
+  return { cum, cumTimeline, finished, winner, finishedAtIndex, reason, teamCum: tcum };
+}
+
+/* Недобір у команді: очки обох партнерів замовника переходять команді соперників (порівну). */
+function calculateTeamUnderTarget(form, players, settings) {
+  const result = {};
+  players.forEach((p) => result[p.id] = { ...form.perPlayer[p.id] });
+  const k = teamKey(form.callerId);
+  const mates = players.filter((p) => teamKey(p.id) === k);
+  const opp = players.filter((p) => teamKey(p.id) !== k);
+  let transfer = 0;
+  mates.forEach((p) => {
+    const e = form.perPlayer[p.id];
+    if (settings.underTargetRule === "trick_only") {
+      transfer += Number(e.trick) || 0;
+      result[p.id] = { ...e, trick: 0 };
+    } else {
+      transfer += (Number(e.trick) || 0) + comboSum(e, settings.comboValues);
+      result[p.id] = { ...e, trick: 0, runCombo: null, marriage: false };
+    }
+  });
+  const first = Math.floor(transfer / 2);
+  opp.forEach((o, i) => { result[o.id]._extra = (result[o.id]._extra || 0) + (i === 0 ? first : transfer - first); });
+  const mateNames = mates.map((m) => m.displayName).join(" + ");
+  const oppNames = opp.map((o) => o.displayName).join(" + ");
+  return { perPlayer: result, message: mateNames + " не виконала замовлення. Очки (" + transfer + ") переходять команді " + oppNames + "." };
+}
+
 function evaluateEnd(rounds, players, settings) {
+  if (settings.teamMode && players.length === 4) return evaluateTeamEnd(rounds, players, settings);
   const cumTimeline = [];
   const cum = {};
   players.forEach((p) => cum[p.id] = 0);
@@ -1086,10 +1164,11 @@ function PlayerSetup({ T, initial, onStart, onTab, roomMembers }) {
   const [count, setCount] = useState(seedMembers.length >= 2 ? seedMembers.length : (initial.settings.playerCount || 2));
   const [names, setNames] = useState({ ...initial.players, ...seedNames });
   const [variant, setVariant] = useState(initial.settings.rulesVariant || "kharkiv");
+  const [mode, setMode] = useState(initial.settings.teamMode ? "team" : "solo");
   const apply = () => {
     let settings = { ...initial.settings, playerCount: count };
     if (variant === "kharkiv") settings = { ...settings, ...defaultSettings(), playerCount: count };
-    onStart({ names, settings, variant });
+    onStart({ names, settings: { ...settings, teamMode: count === 4 && mode === "team", teamBayt: true }, variant });
   };
   return /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 18px 40px", maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 22, marginBottom: 4 } }, "\u041D\u043E\u0432\u0430 \u043F\u0430\u0440\u0442\u0456\u044F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.textMuted, marginBottom: 20 } }, "\u0414\u0435\u0431\u0435\u0440\u0446 \u2014 \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456 \u043F\u0440\u0430\u0432\u0438\u043B\u0430"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, "\u0412\u0430\u0440\u0456\u0430\u043D\u0442 \u043F\u0440\u0430\u0432\u0438\u043B"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 18 } }, /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: variant === "kharkiv", onClick: () => setVariant("kharkiv") }, "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0439"), /* @__PURE__ */ React.createElement(SegButton, { T, color: T.gold, active: variant === "custom", onClick: () => setVariant("custom") }, "\u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0446\u044C\u043A\u0438\u0439")), variant === "kharkiv" && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginBottom: 18, lineHeight: 1.5 } }, "\u0417\u0430\u0441\u0442\u043E\u0441\u0443\u0454 \u0442\u0438\u043F\u043E\u0432\u0456 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F: \u0433\u0440\u0430 \u0434\u043E 1001, \u043B\u0438\u0436\u0430 \u221250, \u043D\u0435\u0434\u043E\u0431\u0456\u0440 \u2014 \u0443\u0441\u0456 \u043E\u0447\u043A\u0438 \u0441\u0443\u043F\u0435\u0440\u043D\u0438\u043A\u0430\u043C, \u0434\u0435\u0431\u0435\u0440\u0446 \u2014 \u043C\u0438\u0442\u0442\u0454\u0432\u0430 \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430. \u0423\u0441\u0435 \u043C\u043E\u0436\u043D\u0430 \u0437\u043C\u0456\u043D\u0438\u0442\u0438 \u043F\u0456\u0437\u043D\u0456\u0448\u0435 \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445."), variant === "custom" && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, color: T.textMuted, marginBottom: 18, lineHeight: 1.5 } }, "\u041F\u043E\u0442\u043E\u0447\u043D\u0456 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u043F\u0440\u0430\u0432\u0438\u043B \u0437\u0430\u043B\u0438\u0448\u0430\u0442\u044C\u0441\u044F \u0431\u0435\u0437 \u0437\u043C\u0456\u043D \u2014 \u0432\u0456\u0434\u0440\u0435\u0434\u0430\u0433\u0443\u0439\u0442\u0435 \u0457\u0445 \u043D\u0430 \u0432\u043A\u043B\u0430\u0434\u0446\u0456 \xAB\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\xBB."), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, "\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0433\u0440\u0430\u0432\u0446\u0456\u0432"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 18 } }, [2, 3, 4].map((n) => /* @__PURE__ */ React.createElement(SegButton, { key: n, T, color: T.gold, active: count === n, onClick: () => setCount(n) }, n))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, "\u0406\u043C\u0435\u043D\u0430 \u0433\u0440\u0430\u0432\u0446\u0456\u0432"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 } }, ["p1", "p2", "p3", "p4"].slice(0, count).map((id, i) => /* @__PURE__ */ React.createElement(
     "input",
@@ -1101,7 +1180,7 @@ function PlayerSetup({ T, initial, onStart, onTab, roomMembers }) {
       maxLength: 16,
       style: { padding: "12px 14px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'Inter',sans-serif", fontSize: 14 }
     }
-  ))), /* @__PURE__ */ React.createElement("button", { onClick: apply, style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 15 } }, "\u041F\u043E\u0447\u0430\u0442\u0438 \u043F\u0430\u0440\u0442\u0456\u044E"), React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 12 } }, React.createElement("button", { onClick: () => onTab && onTab("online"), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, React.createElement(GIcon, { name: "online", size: 18 }), "Онлайн-кімната"), React.createElement("button", { onClick: () => onTab && onTab("rules"), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, React.createElement(GIcon, { name: "rules", size: 18 }), "Правила")));
+  ))), /* @__PURE__ */ count === 4 && React.createElement("div", { style: { marginBottom: 18 } }, React.createElement("div", { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, "Режим гри"), React.createElement("div", { style: { display: "flex", gap: 8 } }, React.createElement(SegButton, { T, color: T.gold, active: mode === "solo", onClick: () => setMode("solo") }, "Кожен за себе"), React.createElement(SegButton, { T, color: T.gold, active: mode === "team", onClick: () => setMode("team") }, "2×2 — команди"))), React.createElement("button", { onClick: apply, style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 15 } }, "\u041F\u043E\u0447\u0430\u0442\u0438 \u043F\u0430\u0440\u0442\u0456\u044E"), React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 12 } }, React.createElement("button", { onClick: () => onTab && onTab("online"), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, React.createElement(GIcon, { name: "online", size: 18 }), "Онлайн-кімната"), React.createElement("button", { onClick: () => onTab && onTab("rules"), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, React.createElement(GIcon, { name: "rules", size: 18 }), "Правила")));
 }
 function AddRoundModal({ T, game, players, editingRound, onClose, onSave }) {
   const s = game.settings;
@@ -1248,6 +1327,15 @@ function RoundConfirm({ T, game, players, form, finals, breakdown, underTargetMe
     const b = breakdown[p.id];
     return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: T.panelAlt, borderRadius: 14, padding: "11px 13px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontFamily: "'Fraunces',serif", marginBottom: 4, color: playerColor(game, p.id, T) } }, p.displayName), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: T.textMuted, lineHeight: 1.8 } }, /* @__PURE__ */ React.createElement("div", null, "\u0412\u0437\u044F\u0442\u043A\u0438: ", b.trick), b.combos > 0 && /* @__PURE__ */ React.createElement("div", null, "\u041A\u043E\u043C\u0431\u0456\u043D\u0430\u0446\u0456\u0457: +", b.combos), b.transferred !== 0 && /* @__PURE__ */ React.createElement("div", null, "\u0412\u0456\u0434 \u043D\u0435\u0434\u043E\u0431\u043E\u0440\u0443: ", fmt(b.transferred)), b.capotBonus > 0 && /* @__PURE__ */ React.createElement("div", null, "\u041A\u0430\u043F\u043E\u0442: +", b.capotBonus), b.noTricksPenalty < 0 && /* @__PURE__ */ React.createElement("div", null, "\u041B\u0438\u0436\u0430: ", b.noTricksPenalty), /* @__PURE__ */ React.createElement("div", { style: { color: T.text, fontWeight: 700, borderTop: `1px dashed ${T.border}`, marginTop: 4, paddingTop: 4 } }, "\u0420\u0430\u0437\u043E\u043C: ", fmt(b.final))));
   })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px dashed ${T.border}`, paddingTop: 12, marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.textMuted, marginBottom: 6 } }, "\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u0440\u0430\u0445\u0443\u043D\u043E\u043A"), players.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: { display: "flex", justifyContent: "space-between", fontFamily: "'IBM Plex Mono',monospace", fontSize: 14, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { color: playerColor(game, p.id, T) } }, p.displayName), /* @__PURE__ */ React.createElement("span", null, cumBefore[p.id], " \u2192 ", /* @__PURE__ */ React.createElement("b", null, cumAfter[p.id]))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: onBack, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.textMuted, fontWeight: 600 } }, "\u0417\u043C\u0456\u043D\u0438\u0442\u0438"), /* @__PURE__ */ React.createElement("button", { onClick: onConfirm, disabled: submitting, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: submitting ? 0.6 : 1 } }, /* @__PURE__ */ React.createElement(Check, { size: 17 }), " \u041F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438")));
+}
+function TeamTotals({ T, game, cum }) {
+  const tot = (k) => ["p1", "p2", "p3", "p4"].filter((id, i) => i % 2 === (k === "t0" ? 0 : 1)).reduce((s, id) => s + (cum[id] || 0), 0);
+  return hx("div", { style: { maxWidth: 480, margin: "0 auto", padding: "10px 16px 0", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } },
+    ["t0", "t1"].map((k, i) => hx("div", { key: k, className: "fx-in", style: { background: T.panel, border: `1px solid ${T.border}`, borderRadius: 20, padding: "12px 14px", textAlign: "center", boxShadow: T.shadow } },
+      hx("div", { style: { fontSize: 12, color: T.textMuted, marginBottom: 4, fontWeight: 600 } }, teamLabel(game, k)),
+      hx("div", { style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 30, fontWeight: 700, color: playerColor(game, i === 0 ? "p1" : "p2", T) } }, tot(k))
+    ))
+  );
 }
 function Scoreboard({ T, game, players, evalResult, setName, openAdd, setConfirmUndo, setConfirmNewGame, setEditingRoundId, onNewGame }) {
   const { cum, finished, winner } = evalResult;
@@ -1953,7 +2041,7 @@ function OnlineTab({ T, net, getLocalGame, onOpenGame }) {
 /* ===================== ОНОВЛЕННЯ ЗАСТОСУНКУ ===================== */
 /* Версію мітимо тут і піднімаємо при кожному релізі. Встановлений на головному екрані застосунок
    інакше тримає стару сторінку, тому перевіряємо свіжий index.html із сервера. */
-const APP_VERSION = "2026.11.11-14";
+const APP_VERSION = "2026.11.11-15";
 async function fetchLatestVersion() {
   const r = await fetch(location.pathname + "?vcheck=" + Date.now(), { cache: "no-store" });
   if (!r.ok) throw new Error("http " + r.status);
@@ -2504,7 +2592,7 @@ function DebertsCounter() {
       style: { width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, display: "flex", alignItems: "center", justifyContent: "center" }
     },
     game.theme === "dark" ? /* @__PURE__ */ React.createElement(Sun, { size: 16, color: T.gold }) : /* @__PURE__ */ React.createElement(Moon, { size: 16, color: T.gold })
-  )), tab === "game" && !game.setupDone && game.rounds.length === 0 && React.createElement(PlayerSetup, { key: "setup", T, initial: game, onTab: setTab, roomMembers: net.room ? net.room.members : null, onStart: ({ names, settings }) => { savePrefsSettings(settings); setGame((g) => ({ ...g, players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, setupDone: true })); } }), tab === "game" && (game.setupDone || game.rounds.length > 0) && /* @__PURE__ */ React.createElement(Scoreboard, { key: "sb", T, game, players, evalResult, onNewGame: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })), setName, openAdd: () => setShowAdd(true), setConfirmUndo, setConfirmNewGame, setEditingRoundId }), tab === "history" && /* @__PURE__ */ React.createElement(History, { T, game, players, cumTimeline: evalResult.cumTimeline, setEditingRoundId }), tab === "stats" && /* @__PURE__ */ React.createElement(Statistics, { T, game, players, cum: evalResult.cum }), tab === "online" && hx(OnlineTab, { T, net, getLocalGame: () => game, onOpenGame: () => setTab("game") }), tab === "rules" && hx(RulesTab, { T, settings: game.settings }), tab === "settings" && /* @__PURE__ */ React.createElement(Settings, { T, game, updateSettings, setConfirmNewGame, onNewGame: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })), saveError, onExport: doExport, onImport: doImport }), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", left: 0, right: 0, bottom: "calc(10px + env(safe-area-inset-bottom))", margin: "0 auto", width: "min(480px, calc(100% - 20px))", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 26, display: "flex", padding: 6, gap: 4, justifyContent: "space-between", zIndex: 30, boxShadow: T.shadow, backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" } }, /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(Crown, { size: 19 }), label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", active: tab === "game", onClick: () => setTab("game") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(HistoryIcon, { size: 19 }), label: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F", active: tab === "history", onClick: () => setTab("history") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(BarChart3, { size: 19 }), label: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430", active: tab === "stats", onClick: () => setTab("stats") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(GIcon, { name: "online", size: 22, color: net.room ? "#5EEABE" : T.textMuted }), label: "Онлайн", active: tab === "online", onClick: () => setTab("online") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(GIcon, { name: "rules", size: 22 }), label: "Правила", active: tab === "rules", onClick: () => setTab("rules") })), tab === "game" && game.setupDone && !evalResult.finished && /* @__PURE__ */ React.createElement(FabAdd, { T, lock: net.lock, myId: net.room ? net.room.you : null, onOpen: () => setShowAdd(true) }), (showAdd || editingRoundId) && /* @__PURE__ */ React.createElement(AddRoundModal, { T, game, players, editingRound, onClose: () => {
+  )), tab === "game" && !game.setupDone && game.rounds.length === 0 && React.createElement(PlayerSetup, { key: "setup", T, initial: game, onTab: setTab, roomMembers: net.room ? net.room.members : null, onStart: ({ names, settings }) => { savePrefsSettings(settings); setGame((g) => ({ ...g, players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, setupDone: true })); } }), tab === "game" && game.settings.teamMode && game.settings.playerCount === 4 && (game.setupDone || game.rounds.length > 0) && React.createElement(TeamTotals, { T, game, cum: evalResult.cum }), tab === "game" && (game.setupDone || game.rounds.length > 0) && /* @__PURE__ */ React.createElement(Scoreboard, { key: "sb", T, game, players, evalResult, onNewGame: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })), setName, openAdd: () => setShowAdd(true), setConfirmUndo, setConfirmNewGame, setEditingRoundId }), tab === "history" && /* @__PURE__ */ React.createElement(History, { T, game, players, cumTimeline: evalResult.cumTimeline, setEditingRoundId }), tab === "stats" && /* @__PURE__ */ React.createElement(Statistics, { T, game, players, cum: evalResult.cum }), tab === "online" && hx(OnlineTab, { T, net, getLocalGame: () => game, onOpenGame: () => setTab("game") }), tab === "rules" && hx(RulesTab, { T, settings: game.settings }), tab === "settings" && /* @__PURE__ */ React.createElement(Settings, { T, game, updateSettings, setConfirmNewGame, onNewGame: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })), saveError, onExport: doExport, onImport: doImport }), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", left: 0, right: 0, bottom: "calc(10px + env(safe-area-inset-bottom))", margin: "0 auto", width: "min(480px, calc(100% - 20px))", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 26, display: "flex", padding: 6, gap: 4, justifyContent: "space-between", zIndex: 30, boxShadow: T.shadow, backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" } }, /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(Crown, { size: 19 }), label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", active: tab === "game", onClick: () => setTab("game") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(HistoryIcon, { size: 19 }), label: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F", active: tab === "history", onClick: () => setTab("history") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(BarChart3, { size: 19 }), label: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430", active: tab === "stats", onClick: () => setTab("stats") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(GIcon, { name: "online", size: 22, color: net.room ? "#5EEABE" : T.textMuted }), label: "Онлайн", active: tab === "online", onClick: () => setTab("online") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(GIcon, { name: "rules", size: 22 }), label: "Правила", active: tab === "rules", onClick: () => setTab("rules") })), tab === "game" && game.setupDone && !evalResult.finished && /* @__PURE__ */ React.createElement(FabAdd, { T, lock: net.lock, myId: net.room ? net.room.you : null, onOpen: () => setShowAdd(true) }), (showAdd || editingRoundId) && /* @__PURE__ */ React.createElement(AddRoundModal, { T, game, players, editingRound, onClose: () => {
     setShowAdd(false);
     setEditingRoundId(null);
   }, onSave: handleSaveRound }), confirmUndo && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmUndo(false) }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u043E\u0441\u0442\u0430\u043D\u043D\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0443?", desc: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A \u043F\u043E\u0432\u0435\u0440\u043D\u0435\u0442\u044C\u0441\u044F \u0434\u043E \u0441\u0442\u0430\u043D\u0443 \u043F\u0435\u0440\u0435\u0434 \u0446\u0456\u0454\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0435\u044E.", confirmLabel: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u0440\u043E\u0437\u0434\u0430\u0447\u0443", onCancel: () => setConfirmUndo(false), onConfirm: undoLast })), confirmNewGame && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmNewGame(false) }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u041F\u043E\u0447\u0430\u0442\u0438 \u043D\u043E\u0432\u0443 \u0433\u0440\u0443?", desc: "\u0423\u0441\u044F \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u0440\u043E\u0437\u0434\u0430\u0447 \u0431\u0443\u0434\u0435 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u0430 \u0431\u0435\u0437\u043F\u043E\u0432\u043E\u0440\u043E\u0442\u043D\u043E. \u0420\u0430\u0434\u0438\u043C\u043E \u0441\u043F\u0435\u0440\u0448\u0443 \u0437\u0440\u043E\u0431\u0438\u0442\u0438 \u0435\u043A\u0441\u043F\u043E\u0440\u0442 \u0433\u0440\u0438.", confirmLabel: "\u0422\u0430\u043A, \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438", onCancel: () => setConfirmNewGame(false), onConfirm: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })) }))), !game.setupDone && game.rounds.length > 0 && null);

@@ -33,7 +33,8 @@ function sliceBalanced(start, open, close) {
 
 const NAMES = [
   "fmt", "defaultSettings", "isKharkivPreset", "playerNameFromList", "comboSum", "rawTotal",
-  "calculateUnderTarget", "computeRound", "evaluateEnd", "validateRound", "applyRunRule", "emptyPerPlayer"
+  "calculateUnderTarget", "computeRound", "evaluateEnd", "validateRound", "applyRunRule", "emptyPerPlayer",
+  "teamKey", "evaluateTeamEnd", "calculateTeamUnderTarget"
 ];
 // Залежності, які потрібні функціям (у браузері їх дає сторінка).
 const stubs = `
@@ -120,4 +121,53 @@ test("перевірка: капот лише одному гравцю і бе�
   const f = form({ p1: entry({ trick: "162", capot: true }), p2: entry({ trick: "5" }) });
   const v = api.validateRound(f, P(["p1", "p2"]), on);
   assert.ok(v.errors.some((e) => e.includes("капоті")));
+});
+
+// ---- Режим 2×2 (команди) ----
+const T4 = (names) => ["p1", "p2", "p3", "p4"].map((id) => ({ id, displayName: names[id] || id }));
+const team = { ...S, teamMode: true, teamBayt: true };
+
+test("команди: p1+p3 проти p2+p4", () => {
+  assert.equal(api.teamKey("p1"), api.teamKey("p3"));
+  assert.equal(api.teamKey("p2"), api.teamKey("p4"));
+  assert.notEqual(api.teamKey("p1"), api.teamKey("p2"));
+});
+
+test("команди: сума партнерів вирішує переможця", () => {
+  const rounds = [{ finals: { p1: 600, p2: 300, p3: 450, p4: 200 } }];
+  const e = api.evaluateEnd(rounds, T4({}), team);
+  assert.equal(e.finished, true);
+  assert.equal(e.winner, "t0", "команда 1: 600 + 450 = 1050");
+});
+
+test("команди: недобір — очки обох партнерів переходять команді соперників", () => {
+  const f = form({
+    p1: entry({ trick: "30" }), p2: entry({ trick: "60" }), p3: entry({ trick: "40" }), p4: entry({ trick: "50" })
+  }, { callerId: "p1", underTarget: true });
+  const r = api.computeRound(f, T4({ p1: "Аня", p2: "Борис", p3: "Віка", p4: "Гліб" }), team);
+  assert.equal(r.finals.p1, 0);
+  assert.equal(r.finals.p3, 0, "партнер замовника теж без очок");
+  assert.equal(r.finals.p2, 60 + 35);
+  assert.equal(r.finals.p4, 50 + 35);
+});
+
+test("команди: байт — команда, що замовила, набрала менше — очки переходять суперникам", () => {
+  const f = form({
+    p1: entry({ trick: "40" }), p3: entry({ trick: "30" }), p2: entry({ trick: "90" }), p4: entry({ trick: "60" })
+  }, { callerId: "p1", underTarget: false });
+  const r = api.computeRound(f, T4({}), team);
+  assert.equal(r.finals.p1, 0);
+  assert.equal(r.finals.p3, 0);
+  assert.equal(r.finals.p2, 90 + 35);
+  assert.equal(r.finals.p4, 60 + 35);
+  assert.ok(r.underTargetMessage.startsWith("Байт"));
+});
+
+test("команди: байт не застосовується, якщо команда набрала більше", () => {
+  const f = form({
+    p1: entry({ trick: "90" }), p3: entry({ trick: "60" }), p2: entry({ trick: "40" }), p4: entry({ trick: "30" })
+  }, { callerId: "p1", underTarget: false });
+  const r = api.computeRound(f, T4({}), team);
+  assert.equal(r.finals.p1, 90);
+  assert.equal(r.finals.p3, 60);
 });
