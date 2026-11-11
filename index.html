@@ -53,7 +53,6 @@ html[data-theme="light"] .fx-title { background: linear-gradient(90deg, #0F2A22 
 /* Екрани, модалки і картки — плавна поява. */
 #root div[style*="max-width: 480px"] { animation: fxIn .55s cubic-bezier(.2, .8, .2, 1) both; }
 #root div[style*="border-top-left-radius: 22px"] { animation: fxSheet .5s cubic-bezier(.2, .8, .2, 1) both; }
-#root div[style*="border-top-left-radius: 22px"] { max-height: calc(100dvh - env(safe-area-inset-top) - 14px) !important; padding-top: calc(16px + env(safe-area-inset-top)) !important; }
 #root div[style*="position: fixed"][style*="z-index: 50"] { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
 /* Кнопки і поля — відгук на дію. */
@@ -67,6 +66,22 @@ html[data-theme="light"] .fx-title { background: linear-gradient(90deg, #0F2A22 
 ::selection { background: rgba(245, 200, 106, .35); }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(94, 234, 190, .25); border-radius: 8px; }
+
+/* ---- Модалки: верх завжди під строкою статусу (оверлей задає відступ, шторка займає решту) ---- */
+#root div[style*="position: fixed"][style*="z-index: 50"] { box-sizing: border-box !important; padding-top: max(72px, calc(env(safe-area-inset-top, 0px) + 14px)) !important; }
+#root div[style*="border-top-left-radius: 22px"] { max-height: 100% !important; padding-top: 18px !important; box-sizing: border-box !important; }
+
+/* ---- apple-design: системний шрифт, пружинні рухи, скляні матеріали ---- */
+:root { --spring: cubic-bezier(.32, 1.18, .5, 1); --ease-out: cubic-bezier(.2, .8, .2, 1); }
+#root *:not([style*="Fraunces"]) { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif !important; }
+#root { -webkit-font-smoothing: antialiased; letter-spacing: -0.008em; }
+#root div[style*="border-top-left-radius: 22px"] { animation: fxSheet .55s var(--spring) both !important; }
+#root button { transition: transform .45s var(--spring), background-color .3s, box-shadow .3s, color .3s, border-color .3s, filter .25s; }
+#root button:active { transform: scale(.94); transition-duration: .12s; }
+#root div[style*="position: fixed"][style*="bottom: 0px"] { transition: transform .4s var(--ease-out); }
+@media (prefers-reduced-transparency: reduce) {
+  #root div[style*="backdrop-filter"], #root div[style*="position: fixed"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
