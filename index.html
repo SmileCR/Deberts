@@ -24,7 +24,7 @@ html[data-theme="light"] { color-scheme: light; }
 body { margin: 0; background: #03100C; overflow-x: hidden; }
 html[data-theme="light"] body { background: #EEF6F1; }
 #fx-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-#root > div { position: relative; z-index: 1; background: transparent !important; }
+#root > div { position: relative; z-index: 1; background: transparent !important; padding-top: env(safe-area-inset-top); }
 
 @keyframes fxIn { from { opacity: 0; transform: translateY(14px) scale(.985); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes fxSheet { from { transform: translateY(44px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -937,7 +937,21 @@ function ConfirmBlock({ T, title, desc, confirmLabel, onCancel, onConfirm }) {
   return /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "6px 6px 4px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 46, height: 46, borderRadius: "50%", background: T.dangerSoft, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 22, color: T.danger }))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 600, marginBottom: 8 } }, title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, color: T.textMuted, marginBottom: 20, lineHeight: 1.5 } }, desc), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: onCancel, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600 } }, "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438"), /* @__PURE__ */ React.createElement("button", { onClick: onConfirm, style: { flex: 1, padding: "13px 0", borderRadius: 14, border: "none", background: T.danger, color: "#fff", fontWeight: 700 } }, confirmLabel)));
 }
 function TabBtn({ icon, label, active, onClick, T }) {
-  return /* @__PURE__ */ React.createElement("button", { onClick, style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 10px", minWidth: 56, color: active ? T.gold : T.textMuted, background: "transparent", border: "none" } }, icon, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600 } }, label));
+  return hx("button", {
+    onClick,
+    "aria-current": active ? "page" : undefined,
+    style: {
+      position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      gap: 2, flex: 1, minWidth: 0, padding: "7px 2px", borderRadius: 19,
+      color: active ? T.gold : T.textMuted,
+      background: active ? `linear-gradient(180deg, ${T.goldSoft}, rgba(245,200,106,0.02))` : "transparent",
+      border: active ? `1px solid ${T.gold}` : "1px solid transparent",
+      boxShadow: active ? `0 0 20px ${T.goldSoft}` : "none"
+    }
+  },
+    hx("span", { style: { display: "flex", fontSize: 18, lineHeight: 1, transform: active ? "translateY(-1px) scale(1.12)" : "none", transition: "transform .3s cubic-bezier(.2,.8,.2,1)" } }, icon),
+    hx("span", { style: { fontSize: 10, fontWeight: 700, letterSpacing: 0.2, whiteSpace: "nowrap" } }, label)
+  );
 }
 function TallyMark({ T }) {
   return /* @__PURE__ */ React.createElement("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none" }, /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "19", x2: "4", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "19", x2: "9", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "14", y1: "19", x2: "14", y2: "7", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("line", { x1: "1", y1: "6", x2: "17", y2: "20", stroke: T.gold, strokeWidth: "2", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("circle", { cx: "20", cy: "13", r: "3.4", stroke: T.gold, strokeWidth: "1.6" }));
@@ -1017,31 +1031,34 @@ function useRoomNet(onRemoteGame, getLocalGame) {
   const [notice, setNotice] = useState(null);
   const [lobbyRooms, setLobbyRooms] = useState([]);
   const [lobbyLoading, setLobbyLoading] = useState(false);
+  const [lock, setLockState] = useState(null);
   const chRef = useRef(null);
   const sessionRef = useRef(null);
   const saveTimerRef = useRef(null);
   const pendingRef = useRef(null);
+  const lastAtRef = useRef(0);
+  const lockTimerRef = useRef(null);
   const remoteRef = useRef(onRemoteGame);
   const localRef = useRef(getLocalGame);
   remoteRef.current = onRemoteGame;
   localRef.current = getLocalGame;
 
-  /* ---------- База даних ---------- */
-  const dbSave = async (code, state) => {
+  /* ---------- База даних (збереження стану, без затримки для вигляду) ---------- */
+  const dbSave = async (code, state, at) => {
     try {
-      await getSb().from(ROOMS_TABLE).update({ state, updated_at: new Date().toISOString() }).eq("code", code);
+      await getSb().from(ROOMS_TABLE).update({ state, updated_at: new Date(at || Date.now()).toISOString() }).eq("code", code);
     } catch (e) {}
   };
   const flushSave = () => {
     clearTimeout(saveTimerRef.current);
     const p = pendingRef.current;
     pendingRef.current = null;
-    if (p) dbSave(p.code, p.state);
+    if (p) dbSave(p.code, p.state, p.at);
   };
-  const scheduleSave = (code, state) => {
-    pendingRef.current = { code, state };
+  const scheduleSave = (code, state, at) => {
+    pendingRef.current = { code, state, at };
     clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(flushSave, 150);
+    saveTimerRef.current = setTimeout(flushSave, 40);
   };
   const refreshLobby = async () => {
     setLobbyLoading(true);
@@ -1062,47 +1079,68 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     setLobbyLoading(false);
   };
 
+  /* Застосувати стан з кімнати. Старіші за вже застосовані — ігноруються. */
+  const applyRemote = (g, at) => {
+    if (at && at < lastAtRef.current) return;
+    if (at) lastAtRef.current = at;
+    remoteRef.current(normalizeGame(g));
+  };
+
   /* ---------- Realtime ---------- */
   const teardown = (keepSession) => {
     flushSave();
     const ch = chRef.current;
     chRef.current = null;
     sessionRef.current = null;
+    lastAtRef.current = 0;
+    clearTimeout(lockTimerRef.current);
     if (!keepSession) lsDel(SESSION_KEY);
     if (ch) {
       try { ch.untrack(); } catch (e) {}
       try { getSb().removeChannel(ch); } catch (e) {}
     }
+    setLockState(null);
     setRoom(null);
     setStatus("offline");
   };
 
+  /* Миттєва відправка: broadcast одразу, у базу — з коротким злиттям. */
   const sendState = (g) => {
     const s = sessionRef.current;
     const ch = chRef.current;
     if (!s || !ch) return;
-    scheduleSave(s.code, g);
-    if (s.subscribed) ch.send({ type: "broadcast", event: "state", payload: { game: g } });
+    const at = Date.now();
+    lastAtRef.current = at;
+    scheduleSave(s.code, g, at);
+    if (s.subscribed) ch.send({ type: "broadcast", event: "state", payload: { game: g, at } });
   };
 
-  /* Підключення до кімнати. mode: "create" | "join" | "restore". */
+  /* Блокування «+»: поки один гравець записує розділ, інші не можуть. */
+  const setLock = (on) => {
+    const s = sessionRef.current;
+    const ch = chRef.current;
+    if (!s || !ch) return;
+    if (on) setLockState({ cid: s.cid, name: s.nick });
+    else setLockState((l) => (l && l.cid === s.cid ? null : l));
+    if (s.subscribed) ch.send({ type: "broadcast", event: "lock", payload: { cid: s.cid, name: s.nick, on: !!on } });
+  };
+
   const enter = async ({ code, nick, isHost, mode, roomName, isPublic }) => {
     const cid = getClientId();
     const sb = getSb();
     setStatus("connecting");
     setNotice(null);
 
-    // 1) Стан кімнати в базі.
-    let state = null;
     let info = null;
     if (mode === "create") {
-      const row = { code, name: roomName, is_public: isPublic, host_name: nick, state: localRef.current(), updated_at: new Date().toISOString() };
+      const at = Date.now();
+      const row = { code, name: roomName, is_public: isPublic, host_name: nick, state: localRef.current(), updated_at: new Date(at).toISOString() };
       const { error } = await sb.from(ROOMS_TABLE).insert(row);
       if (error) { setNotice("Не вдалося створити кімнату. Спробуйте ще раз."); setStatus("offline"); return false; }
-      state = row.state;
       info = { name: roomName, is_public: isPublic };
+      lastAtRef.current = at;
     } else {
-      const { data, error } = await sb.from(ROOMS_TABLE).select("name,is_public,state").eq("code", code).maybeSingle();
+      const { data, error } = await sb.from(ROOMS_TABLE).select("name,is_public,state,updated_at").eq("code", code).maybeSingle();
       if (error) { setNotice("Немає зв'язку з сервером. Перевірте інтернет."); setStatus("offline"); return false; }
       if (!data) {
         lsDel(SESSION_KEY);
@@ -1111,17 +1149,16 @@ function useRoomNet(onRemoteGame, getLocalGame) {
         return false;
       }
       info = { name: data.name, is_public: data.is_public };
-      state = data.state;
-      if (state) {
-        remoteRef.current(normalizeGame(state));
+      const at = new Date(data.updated_at).getTime();
+      if (data.state) {
+        applyRemote(data.state, at);
       } else {
-        // У кімнаті ще немає партії — стаємо її першим станом.
-        await dbSave(code, localRef.current());
+        lastAtRef.current = Date.now();
+        await dbSave(code, localRef.current(), lastAtRef.current);
       }
     }
 
-    // 2) Канал реального часу: учасники і миттєві оновлення.
-    const s = { code, cid, subscribed: false };
+    const s = { code, cid, nick, subscribed: false };
     sessionRef.current = s;
     const ch = sb.channel("deberts:room:" + code, { config: { presence: { key: cid }, broadcast: { self: false } } });
     chRef.current = ch;
@@ -1131,6 +1168,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
       if (chRef.current !== ch) return;
       const members = membersFromPresence(ch);
       const hostM = members.find((m) => m.host) || members[0];
+      setLockState((l) => (l && !members.some((m) => m.id === l.cid) ? null : l));
       setRoom({
         code,
         name: info.name,
@@ -1143,7 +1181,17 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     ch.on("presence", { event: "sync" }, syncRoom);
     ch.on("broadcast", { event: "state" }, ({ payload }) => {
       if (chRef.current !== ch || !payload || !payload.game) return;
-      remoteRef.current(normalizeGame(payload.game));
+      applyRemote(payload.game, payload.at || Date.now());
+    });
+    ch.on("broadcast", { event: "lock" }, ({ payload }) => {
+      if (chRef.current !== ch || !payload) return;
+      clearTimeout(lockTimerRef.current);
+      if (payload.on) {
+        setLockState({ cid: payload.cid, name: payload.name });
+        lockTimerRef.current = setTimeout(() => setLockState(null), 120000);
+      } else {
+        setLockState((l) => (l && l.cid === payload.cid ? null : l));
+      }
     });
     ch.on("broadcast", { event: "closed" }, () => {
       if (chRef.current !== ch) return;
@@ -1183,6 +1231,23 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     if (!sess || !sess.code) { lsDel(SESSION_KEY); return; }
     await enter({ code: sess.code, nick: sess.nick || "Гравець", isHost: !!sess.isHost, mode: "restore" });
   };
+  /* Підтягнути стан з бази, коли вкладка знову активна (на випадок пропущених повідомлень). */
+  useEffect(() => {
+    const onBack = async () => {
+      const s = sessionRef.current;
+      if (!s || document.visibilityState !== "visible") return;
+      try {
+        const { data } = await getSb().from(ROOMS_TABLE).select("state,updated_at").eq("code", s.code).maybeSingle();
+        if (data && data.state) applyRemote(data.state, new Date(data.updated_at).getTime());
+      } catch (e) {}
+    };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+  }, []);
   const leave = () => {
     teardown(false);
     setNotice(null);
@@ -1203,7 +1268,7 @@ function useRoomNet(onRemoteGame, getLocalGame) {
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
   }, []);
-  return { status, room, notice, setNotice, lobbyRooms, lobbyLoading, refreshLobby, createRoom, joinRoom, restore, leave, closeRoom, sendState };
+  return { status, room, notice, setNotice, lobbyRooms, lobbyLoading, refreshLobby, createRoom, joinRoom, restore, leave, closeRoom, sendState, lock, setLock };
 }
 function OnlineNameField({ T }) {
   const [name, setName] = useState(() => lsGet(NICK_KEY, ""));
@@ -1471,56 +1536,6 @@ function dzCard(rank, suit, hl) {
   const stroke = hl ? "#D8B26A" : "#8FA596";
   return `<svg class="dzr-card${hl ? " hl" : ""}" viewBox="0 0 64 90" role="img" aria-label="${rank}${suit}"><rect x="2" y="2" width="60" height="86" rx="9" fill="#FFFCF3" stroke="${stroke}" stroke-width="${hl ? 2.5 : 1.5}"/><text x="9" y="21" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="15" fill="${ink}">${rank}</text><text x="9" y="33" font-size="12" fill="${ink}">${suit}</text><text x="32" y="59" text-anchor="middle" font-size="28" fill="${ink}">${suit}</text><text x="55" y="69" text-anchor="end" font-family="Fraunces,Georgia,serif" font-weight="700" font-size="15" fill="${ink}">${rank}</text><text x="55" y="81" text-anchor="end" font-size="12" fill="${ink}">${suit}</text></svg>`;
 }
-function rulesHtml() {
-  const row = (cards) => `<div class="dzr-row">${cards}</div>`;
-  const tag = (t) => `<span class="dzr-tag">${t}</span>`;
-  const sec = (n, title, body) => `<section class="dzr-sec"><div class="dzr-num">${n}</div><h2>${title}</h2>${body}</section>`;
-  const p = (t) => `<p>${t}</p>`;
-  const combo = (name, desc, cards, value) => `<div class="dzr-combo"><div class="dzr-combo-head"><span>${name}</span><span class="dzr-val">${value}</span></div><div class="dzr-hint">${desc}</div>${row(cards)}</div>`;
-
-  const hero = `<header class="dzr-hero"><div class="dzr-kicker">ДЕБЕРЦ // ПРАВИЛА · 2027</div><h1>Правила гри</h1><p>Харківський варіант. Коротко і наочно.</p></header>`;
-
-  const s1 = sec("01", "Мета гри",
-    p("Гра йде до <b>1001 очка</b>. Після кожної роздачі очки додаються до рахунку. Переможець — той, хто першим перетнув ціль і має більше очок за суперників. Однакова сума — гра триває.") +
-    `<div class="dzr-bar"><i style="width:100%"></i><span style="left:0">0</span><span style="left:50%">501</span><span style="right:0">1001</span></div>`);
-
-  const s2 = sec("02", "Очки карт",
-    row(dzCard("A", "♠") + dzCard("10", "♥") + dzCard("K", "♦") + dzCard("Q", "♣") + dzCard("J", "♠")) +
-    `<div class="dzr-row dzr-tags">${tag("11")}${tag("10")}${tag("4")}${tag("3")}${tag("2")}</div>` +
-    p("Інші карти (6–9) — <b>0 очок</b>. Ліміт очок взяток за роздачу задається в налаштуваннях (типово <b>162</b>: 152 очки карт + 10 за останню взятку)."));
-
-  const s3 = sec("03", "Комбінації",
-    p("Рахується лише <b>найстаріша</b> з ряду терц / полтинник / сотня. Марʼяж можна поєднувати з нею.") +
-    combo("Терц", "3 карти поспіль однієї масті", dzCard("9", "♦") + dzCard("10", "♦") + dzCard("J", "♦"), "+20") +
-    combo("Полтинник", "4 карти поспіль однієї масті", dzCard("9", "♣") + dzCard("10", "♣") + dzCard("J", "♣") + dzCard("Q", "♣"), "+50") +
-    combo("Сотня", "5 карт поспіль однієї масті", dzCard("9", "♠") + dzCard("10", "♠") + dzCard("J", "♠") + dzCard("Q", "♠") + dzCard("K", "♠"), "+100") +
-    combo("Марʼяж · Белла", "Король + дама однієї масті (козирні — белла)", dzCard("K", "♥", true) + dzCard("Q", "♥", true), "+20"));
-
-  const s4 = sec("04", "Деберц",
-    p("<b>7 карт однієї масті поспіль</b> (від сімки до туза) — миттєва перемога. Можна вимкнути в налаштуваннях.") +
-    row(["7", "8", "9", "10", "J", "Q", "K", "A"].map((r) => dzCard(r, "♥", true)).join("")) +
-    `<div class="dzr-tag dzr-tag-big">ДЕБЕРЦ = ПЕРЕМОГА</div>`);
-
-  const s5 = sec("05", "Капот",
-    `<div class="dzr-big">♛</div>` +
-    p("Усі взятки роздачі в <b>одного</b> гравця. Нагорода: <b>+90</b>. Вмикається в налаштуваннях (типово вимкнено). Інші в цій роздачі мають 0 взяток."));
-
-  const s6 = sec("06", "Лижа",
-    `<div class="dzr-flow"><span>0 взяток</span><b>→</b><span class="neg">−50</span></div>` +
-    p("Гравець, що не взяв жодної взятки в роздачі, отримує штраф. Можна вимкнути в налаштуваннях."));
-
-  const s7 = sec("07", "Недобір",
-    p("Якщо замовник не набрав потрібної кількості очок, за обраним правилом його очки переходять суперникам.") +
-    `<div class="dzr-flow"><span>Замовник</span><b>→</b><span>Суперники</span></div>` +
-    `<div class="dzr-hint">Варіанти: <b>всі очки роздачі</b> або <b>лише очки взяток</b> (комбінації лишаються).</div>`);
-
-  const s8 = sec("08", "Підрахунок",
-    `<div class="dzr-formula"><span>взятки</span>+<span>комбінації</span>±<span>капот / лижа</span>±<span>недобір</span>=<b>роздача</b></div>` +
-    p("Сума роздачі додається до рахунку. Деталі кожної роздачі — в «Історії», підсумки — у «Статистиці».") +
-    p("Усі числа й варіанти можна змінити в «Налаштуваннях»."));
-
-  return hero + s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8;
-}
 function rulesCss(T, neon, ng) {
   return `
 .dzr{--c:${T.gold};--p:${T.panel};--pa:${T.panelAlt};--t:${T.text};--m:${T.textMuted};--b:${T.border};--n:${neon};--ng:${ng};max-width:480px;margin:0 auto;padding:14px 16px 40px;color:var(--t);font-family:Inter,sans-serif}
@@ -1564,13 +1579,97 @@ function rulesCss(T, neon, ng) {
 @media (max-width:360px){.dzr-card{width:44px}}
 `;
 }
-function RulesTab({ T }) {
+function FabAdd({ T, lock, myId, onOpen }) {
+  const busy = !!lock && lock.cid !== myId;
+  if (busy) {
+    return hx("div", { className: "fx-in", style: { position: "fixed", right: 18, bottom: 98, zIndex: 35, padding: "12px 16px", borderRadius: 999, background: T.panel, border: `1px solid ${T.gold}`, color: T.gold, fontWeight: 700, fontSize: 13, boxShadow: T.shadow, backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", display: "flex", alignItems: "center", gap: 8, maxWidth: "70vw" } },
+      hx("span", { className: "fx-pulse" }, "✎"),
+      hx("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, `${lock.name} записує…`)
+    );
+  }
+  return hx("button", { onClick: onOpen, className: "fx-glow", style: { position: "fixed", right: 18, bottom: 98, width: 62, height: 62, borderRadius: "50%", background: `linear-gradient(135deg, ${T.gold}, #FFE29A)`, color: T.bg, border: "none", boxShadow: "0 10px 30px rgba(245,200,106,.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, hx(Plus, { size: 26 }));
+}
+
+function rulesHtml(s) {
+  const cv = s.comboValues || {};
+  const row = (cards) => `<div class="dzr-row">${cards}</div>`;
+  const tag = (t) => `<span class="dzr-tag">${t}</span>`;
+  const sec = (n, title, body) => `<section class="dzr-sec"><div class="dzr-num">${n}</div><h2>${title}</h2>${body}</section>`;
+  const p = (t) => `<p>${t}</p>`;
+  const combo = (name, desc, cards, value) => `<div class="dzr-combo"><div class="dzr-combo-head"><span>${name}</span><span class="dzr-val">${value}</span></div><div class="dzr-hint">${desc}</div>${row(cards)}</div>`;
+  const target = Number(s.targetScore) || 1001;
+  const total = s.totalPointsEnabled ? Number(s.totalPoints) || 162 : null;
+  const capot = s.capotEnabled ? `<b>+${s.capotBonus}</b>` : "вимкнено в налаштуваннях";
+  const lyga = s.noTricksEnabled ? `<b>−${s.noTricksPenalty}</b>` : "вимкнено в налаштуваннях";
+  const deb = s.debertsInstantWin ? "миттєва перемога" : "вимкнено: очки додаються вручну";
+  const under = s.underTargetRule === "trick_only"
+    ? "лише очки взяток переходять суперникам, комбінації лишаються"
+    : s.underTargetRule === "off" ? "вимкнено в налаштуваннях" : "усі очки роздачі переходять суперникам";
+  const variant = s.rulesVariant === "custom" ? "Ваші налаштування" : "Харківський варіант";
+
+  const hero = `<header class="dzr-hero"><div class="dzr-kicker">ДЕБЕРЦ // ПРАВИЛА · 2027</div><h1>Правила гри</h1><p>${variant}. Значення нижче — з поточних налаштувань.</p></header>`;
+
+  const s1 = sec("01", "Мета гри",
+    p(`Гра йде до <b>${target} очок</b>. Після кожної роздачі очки додаються до рахунку. Переможець — той, хто першим перетнув ціль і має більше очок за суперників. Однакова сума — гра триває.`) +
+    `<div class="dzr-bar"><i style="width:100%"></i><span style="left:0">0</span><span style="left:50%">${Math.round(target / 2)}</span><span style="right:0">${target}</span></div>`);
+
+  const s2 = sec("02", "Очки карт",
+    row(dzCard("A", "♠") + dzCard("10", "♥") + dzCard("K", "♦") + dzCard("Q", "♣") + dzCard("J", "♠")) +
+    `<div class="dzr-row dzr-tags">${tag("11")}${tag("10")}${tag("4")}${tag("3")}${tag("2")}</div>` +
+    p(`Інші карти (6–9) — <b>0 очок</b>.` + (total ? ` Сума очок взяток за роздачу — <b>${total}</b> (152 очки карт + 10 за останню взятку).` : " Перевірку суми очок взяток вимкнено.")));
+
+  const s3 = sec("03", "Комбінації",
+    p("Рахується лише <b>найстаріша</b> з ряду терц / полтинник / сотня. Марʼяж можна поєднувати з нею.") +
+    combo("Терц", "3 карти поспіль однієї масті", dzCard("9", "♦") + dzCard("10", "♦") + dzCard("J", "♦"), `+${cv.terc}`) +
+    combo("Полтинник", "4 карти поспіль однієї масті", dzCard("9", "♣") + dzCard("10", "♣") + dzCard("J", "♣") + dzCard("Q", "♣"), `+${cv.poltinnik}`) +
+    combo("Сотня", "5 карт поспіль однієї масті", dzCard("9", "♠") + dzCard("10", "♠") + dzCard("J", "♠") + dzCard("Q", "♠") + dzCard("K", "♠"), `+${cv.sotnya}`) +
+    combo("Марʼяж · Белла", "Король + дама однієї масті (козирні — белла)", dzCard("K", "♥", true) + dzCard("Q", "♥", true), `+${cv.marriage}`));
+
+  const s4 = sec("04", "Деберц",
+    p("<b>7 карт однієї масті поспіль</b> (від сімки до туза) — " + deb + ".") +
+    row(["7", "8", "9", "10", "J", "Q", "K", "A"].map((r) => dzCard(r, "♥", true)).join("")) +
+    `<div class="dzr-tag dzr-tag-big">${s.debertsInstantWin ? "ДЕБЕРЦ = ПЕРЕМОГА" : "ДЕБЕРЦ = ОЧКИ ВРУЧНУ"}</div>`);
+
+  const s5 = sec("05", "Капот",
+    `<div class="dzr-big">♛</div>` +
+    p(`Усі взятки роздачі в <b>одного</b> гравця. Нагорода: ${capot}. Інші в цій роздачі мають 0 взяток.`));
+
+  const s6 = sec("06", "Лижа",
+    `<div class="dzr-flow"><span>0 взяток</span><b>→</b><span class="neg">${lyga}</span></div>` +
+    p("Гравець, що не взяв жодної взятки в роздачі, отримує штраф."));
+
+  const s7 = sec("07", "Недобір",
+    p("Якщо замовник не набрав потрібної кількості очок, за обраним правилом його очки переходять суперникам.") +
+    `<div class="dzr-flow"><span>Замовник</span><b>→</b><span>Суперники</span></div>` +
+    `<div class="dzr-hint">Зараз: <b>${under}</b>.</div>`);
+
+  const s8 = sec("08", "Підрахунок",
+    `<div class="dzr-formula"><span>взятки</span>+<span>комбінації</span>±<span>капот / лижа</span>±<span>недобір</span>=<b>роздача</b></div>` +
+    p("Сума роздачі додається до рахунку. Деталі кожної роздачі — в «Історії», підсумки — у «Статистиці».") +
+    p("Усі числа й варіанти можна змінити в «Налаштуваннях»."));
+
+  return hero + s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8;
+}
+const RULES_EXTRA_CSS = `
+.dzr-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:8px;justify-items:center;align-items:end}
+.dzr-card{width:100%;max-width:56px;height:auto}
+.dzr-tags{grid-template-columns:repeat(5,1fr)}
+.dzr-tags .dzr-tag{justify-self:center}
+.dzr-combo-head{letter-spacing:0}
+.dzr-hero h1{letter-spacing:-0.02em;line-height:1.05}
+.dzr-sec h2{letter-spacing:-0.01em}
+.dzr-sec p,.dzr-hint{letter-spacing:0.005em}
+.dzr-kicker,.dzr-num,.dzr-tag,.dzr-val{letter-spacing:0.12em}
+.dzr-bar span{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-transparency: reduce){.dzr-sec,.dzr-hero{backdrop-filter:none}}
+`;
+function RulesTab({ T, settings }) {
   const dark = T.bg === THEMES.dark.bg;
   const neon = dark ? "#5FE3FF" : "#0E7C9A";
   const ng = dark ? "rgba(95,227,255,.22)" : "rgba(14,124,154,.18)";
   return hx("div", null,
-    hx("style", null, rulesCss(T, neon, ng)),
-    hx("div", { className: "dzr", dangerouslySetInnerHTML: { __html: rulesHtml() } })
+    hx("style", null, rulesCss(T, neon, ng) + RULES_EXTRA_CSS),
+    hx("div", { className: "dzr", dangerouslySetInnerHTML: { __html: rulesHtml(settings) } })
   );
 }
 
@@ -1638,6 +1737,8 @@ function DebertsCounter() {
   useEffect(() => {
     if (evalResult.finished) window.dispatchEvent(new Event("fx:burst"));
   }, [evalResult.finished]);
+  useEffect(() => { window.scrollTo(0, 0); }, [tab]);
+  useEffect(() => { if (net.room) net.setLock(showAdd || !!editingRoundId); }, [showAdd, editingRoundId]);
   const updateSettings = (patch) => setGame((g) => {
     const settings = { ...g.settings, ...patch };
     savePrefsSettings(settings);
@@ -1702,7 +1803,7 @@ function DebertsCounter() {
       style: { width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.border}`, background: T.panelAlt, display: "flex", alignItems: "center", justifyContent: "center" }
     },
     game.theme === "dark" ? /* @__PURE__ */ React.createElement(Sun, { size: 16, color: T.gold }) : /* @__PURE__ */ React.createElement(Moon, { size: 16, color: T.gold })
-  )), tab === "game" && !game.setupDone && game.rounds.length === 0 && React.createElement(PlayerSetup, { T, initial: game, onTab: setTab, roomMembers: net.room ? net.room.members : null, onStart: ({ names, settings }) => { savePrefsSettings(settings); setGame((g) => ({ ...g, players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, setupDone: true })); } }), tab === "game" && (game.setupDone || game.rounds.length > 0) && /* @__PURE__ */ React.createElement(Scoreboard, { T, game, players, evalResult, setName, openAdd: () => setShowAdd(true), setConfirmUndo, setConfirmNewGame, setEditingRoundId }), tab === "history" && /* @__PURE__ */ React.createElement(History, { T, game, players, cumTimeline: evalResult.cumTimeline, setEditingRoundId }), tab === "stats" && /* @__PURE__ */ React.createElement(Statistics, { T, game, players, cum: evalResult.cum }), tab === "online" && hx(OnlineTab, { T, net, getLocalGame: () => game, onOpenGame: () => setTab("game") }), tab === "rules" && hx(RulesTab, { T }), tab === "settings" && /* @__PURE__ */ React.createElement(Settings, { T, game, updateSettings, setConfirmNewGame, saveError, onExport: doExport, onImport: doImport }), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.panel, borderTop: `1px solid ${T.border}`, display: "flex", padding: "8px 6px calc(8px + env(safe-area-inset-bottom))", justifyContent: "space-around", zIndex: 30 } }, /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(Crown, { size: 19 }), label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", active: tab === "game", onClick: () => setTab("game") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(HistoryIcon, { size: 19 }), label: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F", active: tab === "history", onClick: () => setTab("history") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(BarChart3, { size: 19 }), label: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430", active: tab === "stats", onClick: () => setTab("stats") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(IconBase, { glyph: "🌐", size: 19, color: net.room ? "#5EEABE" : T.textMuted }), label: "Онлайн", active: tab === "online", onClick: () => setTab("online") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(IconBase, { glyph: "\u{1F4D6}", size: 19 }), label: "Правила", active: tab === "rules", onClick: () => setTab("rules") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(SettingsIcon, { size: 19 }), label: "\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F", active: tab === "settings", onClick: () => setTab("settings") })), tab === "game" && game.setupDone && !evalResult.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setShowAdd(true), style: { position: "fixed", right: 18, bottom: 82, width: 60, height: 60, borderRadius: "50%", background: T.gold, color: T.bg, border: "none", boxShadow: T.shadow, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 35 } }, /* @__PURE__ */ React.createElement(Plus, { size: 26 })), (showAdd || editingRoundId) && /* @__PURE__ */ React.createElement(AddRoundModal, { T, game, players, editingRound, onClose: () => {
+  )), tab === "game" && !game.setupDone && game.rounds.length === 0 && React.createElement(PlayerSetup, { T, initial: game, onTab: setTab, roomMembers: net.room ? net.room.members : null, onStart: ({ names, settings }) => { savePrefsSettings(settings); setGame((g) => ({ ...g, players: { p1: "", p2: "", p3: "", p4: "", ...names }, settings, setupDone: true })); } }), tab === "game" && (game.setupDone || game.rounds.length > 0) && /* @__PURE__ */ React.createElement(Scoreboard, { T, game, players, evalResult, setName, openAdd: () => setShowAdd(true), setConfirmUndo, setConfirmNewGame, setEditingRoundId }), tab === "history" && /* @__PURE__ */ React.createElement(History, { T, game, players, cumTimeline: evalResult.cumTimeline, setEditingRoundId }), tab === "stats" && /* @__PURE__ */ React.createElement(Statistics, { T, game, players, cum: evalResult.cum }), tab === "online" && hx(OnlineTab, { T, net, getLocalGame: () => game, onOpenGame: () => setTab("game") }), tab === "rules" && hx(RulesTab, { T, settings: game.settings }), tab === "settings" && /* @__PURE__ */ React.createElement(Settings, { T, game, updateSettings, setConfirmNewGame, saveError, onExport: doExport, onImport: doImport }), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", left: 0, right: 0, bottom: "calc(10px + env(safe-area-inset-bottom))", margin: "0 auto", width: "min(480px, calc(100% - 20px))", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 26, display: "flex", padding: 6, gap: 4, justifyContent: "space-between", zIndex: 30, boxShadow: T.shadow, backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" } }, /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(Crown, { size: 19 }), label: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A", active: tab === "game", onClick: () => setTab("game") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(HistoryIcon, { size: 19 }), label: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F", active: tab === "history", onClick: () => setTab("history") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(BarChart3, { size: 19 }), label: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430", active: tab === "stats", onClick: () => setTab("stats") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(IconBase, { glyph: "🌐", size: 19, color: net.room ? "#5EEABE" : T.textMuted }), label: "Онлайн", active: tab === "online", onClick: () => setTab("online") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: React.createElement(IconBase, { glyph: "\u{1F4D6}", size: 19 }), label: "Правила", active: tab === "rules", onClick: () => setTab("rules") }), /* @__PURE__ */ React.createElement(TabBtn, { T, icon: /* @__PURE__ */ React.createElement(SettingsIcon, { size: 19 }), label: "\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F", active: tab === "settings", onClick: () => setTab("settings") })), tab === "game" && game.setupDone && !evalResult.finished && /* @__PURE__ */ React.createElement(FabAdd, { T, lock: net.lock, myId: net.room ? net.room.you : null, onOpen: () => setShowAdd(true) }), (showAdd || editingRoundId) && /* @__PURE__ */ React.createElement(AddRoundModal, { T, game, players, editingRound, onClose: () => {
     setShowAdd(false);
     setEditingRoundId(null);
   }, onSave: handleSaveRound }), confirmUndo && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmUndo(false) }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u043E\u0441\u0442\u0430\u043D\u043D\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0443?", desc: "\u0420\u0430\u0445\u0443\u043D\u043E\u043A \u043F\u043E\u0432\u0435\u0440\u043D\u0435\u0442\u044C\u0441\u044F \u0434\u043E \u0441\u0442\u0430\u043D\u0443 \u043F\u0435\u0440\u0435\u0434 \u0446\u0456\u0454\u044E \u0440\u043E\u0437\u0434\u0430\u0447\u0435\u044E.", confirmLabel: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438 \u0440\u043E\u0437\u0434\u0430\u0447\u0443", onCancel: () => setConfirmUndo(false), onConfirm: undoLast })), confirmNewGame && /* @__PURE__ */ React.createElement(Modal, { T, onClose: () => setConfirmNewGame(false) }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement(ConfirmBlock, { T, title: "\u041F\u043E\u0447\u0430\u0442\u0438 \u043D\u043E\u0432\u0443 \u0433\u0440\u0443?", desc: "\u0423\u0441\u044F \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u0440\u043E\u0437\u0434\u0430\u0447 \u0431\u0443\u0434\u0435 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u0430 \u0431\u0435\u0437\u043F\u043E\u0432\u043E\u0440\u043E\u0442\u043D\u043E. \u0420\u0430\u0434\u0438\u043C\u043E \u0441\u043F\u0435\u0440\u0448\u0443 \u0437\u0440\u043E\u0431\u0438\u0442\u0438 \u0435\u043A\u0441\u043F\u043E\u0440\u0442 \u0433\u0440\u0438.", confirmLabel: "\u0422\u0430\u043A, \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438", onCancel: () => setConfirmNewGame(false), onConfirm: () => setGame((g) => ({ ...defaultGame(), theme: g.theme, setupDone: false })) }))), !game.setupDone && game.rounds.length > 0 && null);
