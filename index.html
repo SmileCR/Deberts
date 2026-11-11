@@ -1953,7 +1953,7 @@ function OnlineTab({ T, net, getLocalGame, onOpenGame }) {
 /* ===================== ОНОВЛЕННЯ ЗАСТОСУНКУ ===================== */
 /* Версію мітимо тут і піднімаємо при кожному релізі. Встановлений на головному екрані застосунок
    інакше тримає стару сторінку, тому перевіряємо свіжий index.html із сервера. */
-const APP_VERSION = "2026.11.11-13";
+const APP_VERSION = "2026.11.11-14";
 async function fetchLatestVersion() {
   const r = await fetch(location.pathname + "?vcheck=" + Date.now(), { cache: "no-store" });
   if (!r.ok) throw new Error("http " + r.status);
@@ -2206,7 +2206,7 @@ const RULES_TX = {
     bidder: "Замовник", opponents: "Суперники", nowLabel: "Зараз:",
     totalsTitle: "Підрахунок", fTricks: "взятки", fCombos: "комбінації", fCapot: "капот / лижа", fUnder: "недобір", fRound: "роздача",
     totalsText: "Сума роздачі додається до рахунку. Деталі кожної роздачі — в «Історії», підсумки — у «Статистиці».",
-    changeText: "Усі числа й варіанти можна змінити в «Налаштуваннях»."
+    trumpText: "У козирній масті: <b>валет — 20</b>, <b>дев'ятка — 14</b>. Звичайний валет — 2, інші дев'ятки, 7 і 8 — 0.", teamTitle: "2×2 — команди", teamText: "Гравці грають парами і сидять одне навпроти одного. Партнери не показують одне одному карт, але їхні очки складаються. Першою ціль набирає команда — вона й перемагає. Комбінації обох партнерів йдуть у загальний рахунок команди. Якщо команда, що замовила гру, набрала менше за суперників — це байт, її очки переходять суперникам.", changeText: "Усі числа й варіанти можна змінити в «Налаштуваннях»."
   },
   en: {
     off: "off in Settings", instant: "instant win", manual: "off: points are added manually",
@@ -2227,7 +2227,7 @@ const RULES_TX = {
     bidder: "Bidder", opponents: "Opponents", nowLabel: "Now:",
     totalsTitle: "Totals", fTricks: "tricks", fCombos: "combinations", fCapot: "capot / lizha", fUnder: "shortfall", fRound: "round",
     totalsText: "The round total is added to the score. Round details are in History, totals in Stats.",
-    changeText: "All numbers and variants can be changed in Settings."
+    trumpText: "In the trump suit: <b>jack — 20</b>, <b>nine — 14</b>. Other jacks — 2, other nines, 7 and 8 — 0.", teamTitle: "2×2 — teams", teamText: "Players play in pairs and sit opposite each other. Partners do not show each other their cards, but their points add up. The team that first reaches the target wins. Combinations of both partners count toward the team total. If the bidding team scores less than the opponents, it is a “bayt”: its points go to the opponents.", changeText: "All numbers and variants can be changed in Settings."
   },
   de: {
     off: "in den Einstellungen aus", instant: "sofortiger Sieg", manual: "aus: Punkte werden manuell addiert",
@@ -2248,7 +2248,7 @@ const RULES_TX = {
     bidder: "Ansager", opponents: "Gegner", nowLabel: "Jetzt:",
     totalsTitle: "Zählung", fTricks: "Stiche", fCombos: "Kombinationen", fCapot: "Capot / Lischa", fUnder: "Unterbieten", fRound: "Runde",
     totalsText: "Die Rundensumme wird zum Stand addiert. Details stehen im Verlauf, Summen in der Statistik.",
-    changeText: "Alle Zahlen und Varianten kannst du in den Einstellungen ändern."
+    trumpText: "In der Trumpffarbe: <b>Bube — 20</b>, <b>Neun — 14</b>. Übrige Buben — 2, übrige Neunen, 7 und 8 — 0.", teamTitle: "2×2 — Teams", teamText: "Die Spieler spielen zu zweit und sitzen einander gegenüber. Partner zeigen sich ihre Karten nicht, ihre Punkte werden aber addiert. Das Team, das zuerst das Ziel erreicht, gewinnt. Kombinationen beider Partner zählen zur Teamsumme. Erreicht das ansagende Team weniger als die Gegner, ist es ein „Bajt“: seine Punkte gehen an die Gegner.", changeText: "Alle Zahlen und Varianten kannst du in den Einstellungen ändern."
   },
   ru: {
     off: "выключено в настройках", instant: "мгновенная победа", manual: "выключено: очки добавляются вручную",
@@ -2269,7 +2269,7 @@ const RULES_TX = {
     bidder: "Заказчик", opponents: "Соперники", nowLabel: "Сейчас:",
     totalsTitle: "Подсчёт", fTricks: "взятки", fCombos: "комбинации", fCapot: "капот / лыжа", fUnder: "недобор", fRound: "раздача",
     totalsText: "Сумма раздачи добавляется к счёту. Детали каждой раздачи — в «Истории», итоги — в «Статистике».",
-    changeText: "Все числа и варианты можно изменить в «Настройках»."
+    trumpText: "В козырной масти: <b>валет — 20</b>, <b>девятка — 14</b>. Обычный валет — 2, остальные девятки, 7 и 8 — 0.", teamTitle: "2×2 — команды", teamText: "Игроки играют парами и сидят напротив друг друга. Партнёры не показывают друг другу карты, но их очки складываются. Первой цели достигает команда — она и побеждает. Комбинации обоих партнёров идут в общий счёт команды. Если заказавшая команда набрала меньше соперников, это байт: её очки переходят соперникам.", changeText: "Все числа и варианты можно изменить в «Настройках»."
   }
 };
 function rulesHtml(s) {
@@ -2296,7 +2296,8 @@ function rulesHtml(s) {
     `<div class="dzr-bar"><i style="width:100%"></i><span style="left:0">0</span><span style="left:50%">${Math.round(target / 2)}</span><span style="right:0">${target}</span></div>`);
   const s2 = sec("02", tx.cardPoints,
     `<div class="dzr-cards5">${col(dzCard("A", "♠"), "11")}${col(dzCard("10", "♥"), "10")}${col(dzCard("K", "♦"), "4")}${col(dzCard("Q", "♣"), "3")}${col(dzCard("J", "♠"), "2")}</div>` +
-    p(tx.otherCards + (total ? " " + tx.totalText(total) : " " + tx.totalOff)));
+    p(tx.otherCards + (total ? " " + tx.totalText(total) : " " + tx.totalOff)) + p(tx.trumpText));
+  const s9 = sec("09", tx.teamTitle, p(tx.teamText));
   const s3 = sec("03", tx.combos,
     p(tx.comboText) +
     combo(tx.terc, tx.tercDesc, dzCard("9", "♦") + dzCard("10", "♦") + dzCard("J", "♦"), `+${cv.terc}`) +
@@ -2313,7 +2314,7 @@ function rulesHtml(s) {
   const s8 = sec("08", tx.totalsTitle,
     `<div class="dzr-formula"><span>${tx.fTricks}</span>+<span>${tx.fCombos}</span>±<span>${tx.fCapot}</span>±<span>${tx.fUnder}</span>=<b>${tx.fRound}</b></div>` +
     p(tx.totalsText) + p(tx.changeText));
-  return hero + s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8;
+  return hero + s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9;
 }
 const RULES_EXTRA_CSS = `
 .dzr-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:8px;justify-items:center;align-items:end}
