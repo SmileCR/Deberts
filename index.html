@@ -489,6 +489,9 @@ Object.assign(DZ_I18N.ru, {
 Object.assign(DZ_I18N.en, {"Поточний варіант: ":"Current variant: ","Гравців у грі: ":"Players in game: "});
 Object.assign(DZ_I18N.de, {"Поточний варіант: ":"Aktuelle Variante: ","Гравців у грі: ":"Spieler im Spiel: "});
 Object.assign(DZ_I18N.ru, {"Поточний варіант: ":"Текущий вариант: ","Гравців у грі: ":"Игроков в игре: "});
+Object.assign(DZ_I18N.en, {"Застосує типові налаштування: гра до 1001, лижа −50, недобір — усі очки суперникам, деберц — миттєва перемога. Усе можна змінити пізніше у налаштуваннях.":"Applies the usual settings: play to 1001, lizha −50, shortfall: all points to the opponents, debertz: instant win. Everything can be changed later in Settings."});
+Object.assign(DZ_I18N.de, {"Застосує типові налаштування: гра до 1001, лижа −50, недобір — усі очки суперникам, деберц — миттєва перемога. Усе можна змінити пізніше у налаштуваннях.":"Übernimmt die üblichen Einstellungen: bis 1001, Lischa −50, Unterbieten: alle Punkte an die Gegner, Debertz: sofortiger Sieg. Alles lässt sich später in den Einstellungen ändern."});
+Object.assign(DZ_I18N.ru, {"Застосує типові налаштування: гра до 1001, лижа −50, недобір — усі очки суперникам, деберц — миттєва перемога. Усе можна змінити пізніше у налаштуваннях.":"Применит типичные настройки: игра до 1001, лыжа −50, недобор: все очки соперникам, деберц: мгновенная победа. Всё можно изменить позже в настройках."});
 /* Переклад тексту інтерфейсу: рядкові дочірні елементи й placeholder підміняються за мовою пристрою. */
 (function () {
   const orig = React.createElement;
@@ -532,6 +535,16 @@ const GICON = {
   rules: '<path d="M5 4.5A2 2 0 0 1 7 2.5h11.5v16H7a2 2 0 0 0-2 2z"/><path d="M5 20.5V4.5M9 7h5"/>',
   settings: '<path d="M18.81 10.37L21.13 10.85L21.20 12.29L18.91 13.10L17.97 15.66L19.27 17.64L18.30 18.71L16.11 17.66L13.63 18.81L13.15 21.13L11.71 21.20L10.90 18.91L8.34 17.97L6.36 19.27L5.29 18.30L6.34 16.11L5.19 13.63L2.87 13.15L2.80 11.71L5.09 10.90L6.03 8.34L4.73 6.36L5.70 5.29L7.89 6.34L10.37 5.19L10.85 2.87L12.29 2.80L13.10 5.09L15.66 6.03L17.64 4.73L18.71 5.70L17.66 7.89Z"/><path d="M14.8 12A2.8 2.8 0 1 0 9.2 12A2.8 2.8 0 1 0 14.8 12Z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  check: '<path d="M4 12.5 9.5 18 20 6.5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
+  upload: '<path d="M12 20V9M7.5 13.5 12 9l4.5 4.5M5 4h14"/>',
+  chevron: '<path d="M9 6l6 6-6 6"/>',
+  warn: '<path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 10v4M12 17h.01"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
   moon: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>'
 };
 function GIcon({ name, size = 20, color }) {
@@ -543,24 +556,24 @@ function GIcon({ name, size = 20, color }) {
     dangerouslySetInnerHTML: { __html: GICON[name] || "" }
   });
 }
-const Plus = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "+", ...p });
-const Undo2 = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u21BA", ...p });
+const Plus = (p) => hx(GIcon, { name: "plus", size: p.size || 16, color: p.color, style: p.style });
+const Undo2 = (p) => hx(GIcon, { name: "undo", size: p.size || 16, color: p.color, style: p.style });
 const SettingsIcon = (p) => hx(GIcon, { name: "settings", size: p.size || 16, color: p.color });
 const HistoryIcon = (p) => hx(GIcon, { name: "history", size: p.size || 16, color: p.color });
 const BarChart3 = (p) => hx(GIcon, { name: "stats", size: p.size || 16, color: p.color });
 const Sun = (p) => hx(GIcon, { name: "sun", size: p.size || 16, color: p.color });
 const Moon = (p) => hx(GIcon, { name: "moon", size: p.size || 16, color: p.color });
-const X = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2715", ...p });
-const Check = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2713", ...p });
+const X = (p) => hx(GIcon, { name: "x", size: p.size || 16, color: p.color, style: p.style });
+const Check = (p) => hx(GIcon, { name: "check", size: p.size || 16, color: p.color, style: p.style });
 const Crown = (p) => hx(GIcon, { name: "crown", size: p.size || 16, color: p.color });
-const RotateCcw = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u21BA", ...p });
-const AlertTriangle = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u26A0", ...p });
-const Pencil = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u270E", ...p });
-const Info = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u24D8", ...p });
-const Download = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2B07", ...p });
-const Upload = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2B06", ...p });
-const ChevronRight = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u203A", ...p });
-const ShieldCheck = (p) => /* @__PURE__ */ React.createElement(IconBase, { glyph: "\u2713", ...p });
+const RotateCcw = (p) => hx(GIcon, { name: "undo", size: p.size || 16, color: p.color, style: p.style });
+const AlertTriangle = (p) => hx(GIcon, { name: "warn", size: p.size || 16, color: p.color, style: p.style });
+const Pencil = (p) => hx(GIcon, { name: "edit", size: p.size || 16, color: p.color, style: p.style });
+const Info = (p) => hx(GIcon, { name: "info", size: p.size || 16, color: p.color, style: p.style });
+const Download = (p) => hx(GIcon, { name: "download", size: p.size || 16, color: p.color, style: p.style });
+const Upload = (p) => hx(GIcon, { name: "upload", size: p.size || 16, color: p.color, style: p.style });
+const ChevronRight = (p) => hx(GIcon, { name: "chevron", size: p.size || 16, color: p.color, style: p.style });
+const ShieldCheck = (p) => hx(GIcon, { name: "check", size: p.size || 16, color: p.color, style: p.style });
 const RUN_COMBOS = [
   { key: "terc", label: "\u0422\u0435\u0440\u0446", desc: "3 \u043A\u0430\u0440\u0442\u0438 \u043F\u043E\u0441\u043F\u0456\u043B\u044C \u043E\u0434\u043D\u0456\u0454\u0457 \u043C\u0430\u0441\u0442\u0456", value: 20 },
   { key: "poltinnik", label: "\u041F\u043E\u043B\u0442\u0438\u043D\u043D\u0438\u043A", desc: "4 \u043A\u0430\u0440\u0442\u0438 \u043F\u043E\u0441\u043F\u0456\u043B\u044C \u043E\u0434\u043D\u0456\u0454\u0457 \u043C\u0430\u0441\u0442\u0456", value: 50 },
@@ -1085,7 +1098,7 @@ function PlayerSetup({ T, initial, onStart, onTab, roomMembers }) {
       maxLength: 16,
       style: { padding: "12px 14px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.panelAlt, color: T.text, fontFamily: "'Inter',sans-serif", fontSize: 14 }
     }
-  ))), /* @__PURE__ */ React.createElement("button", { onClick: apply, style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 15 } }, "\u041F\u043E\u0447\u0430\u0442\u0438 \u043F\u0430\u0440\u0442\u0456\u044E"), React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 12 } }, React.createElement("button", { onClick: () => onTab && onTab("online"), style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, "\uD83C\uDF10 \u041E\u043D\u043B\u0430\u0439\u043D-\u043A\u0456\u043C\u043D\u0430\u0442\u0430"), React.createElement("button", { onClick: () => onTab && onTab("rules"), style: { flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, "\uD83D\uDCDC \u041F\u0440\u0430\u0432\u0438\u043B\u0430")));
+  ))), /* @__PURE__ */ React.createElement("button", { onClick: apply, style: { width: "100%", padding: "15px 0", borderRadius: 14, border: "none", background: T.gold, color: T.bg, fontWeight: 700, fontSize: 15 } }, "\u041F\u043E\u0447\u0430\u0442\u0438 \u043F\u0430\u0440\u0442\u0456\u044E"), React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 12 } }, React.createElement("button", { onClick: () => onTab && onTab("online"), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, React.createElement(GIcon, { name: "online", size: 18 }), "Онлайн-кімната"), React.createElement("button", { onClick: () => onTab && onTab("rules"), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flex: 1, padding: "13px 0", borderRadius: 14, border: `1px solid ${T.border}`, background: "transparent", color: T.text, fontWeight: 600, fontSize: 14 } }, React.createElement(GIcon, { name: "rules", size: 18 }), "Правила")));
 }
 function AddRoundModal({ T, game, players, editingRound, onClose, onSave }) {
   const s = game.settings;
@@ -1937,7 +1950,7 @@ function OnlineTab({ T, net, getLocalGame, onOpenGame }) {
 /* ===================== ОНОВЛЕННЯ ЗАСТОСУНКУ ===================== */
 /* Версію мітимо тут і піднімаємо при кожному релізі. Встановлений на головному екрані застосунок
    інакше тримає стару сторінку, тому перевіряємо свіжий index.html із сервера. */
-const APP_VERSION = "2026.11.11-10";
+const APP_VERSION = "2026.11.11-11";
 async function fetchLatestVersion() {
   const r = await fetch(location.pathname + "?vcheck=" + Date.now(), { cache: "no-store" });
   if (!r.ok) throw new Error("http " + r.status);
